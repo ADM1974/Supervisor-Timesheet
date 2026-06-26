@@ -1,0 +1,34 @@
+Timesheet Approvals (Supervisor app) — VERSION 1.1  (2026-06-27)
+
+v1.1: supervisor-to-sites matching now reads the "Manager" People Picker on the
+Sites list (resolves the picked person's email from 365 via the User Information
+List); the "ManagerEmail" text column is now an OPTIONAL fallback, not required.
+
+
+Third app in the suite (contractor + staff already exist). Supervisors sign in
+with their Microsoft 365 account and approve/reject the SUBMITTED timesheets for
+the sites they supervise. Reads & writes the SAME Timesheets SharePoint list.
+
+How it decides what a supervisor sees:
+  - Reads the "Sites" list and keeps rows whose ManagerEmail = the supervisor's
+    email, giving their supervised sites.
+  - Shows every Submitted Timesheets row for those sites, grouped one card per
+    person's week (name, site, days, work orders, hours, total).
+  - Approve  -> Status=Approved, ApprovedDate=now, approver email appended to Notes.
+  - Reject   -> Status=Rejected, RejectionReason=the typed reason.
+  - Server re-checks every row is Submitted AND on one of the supervisor's sites,
+    so nobody can approve outside their sites.
+
+REQUIRES one small SharePoint change:
+  - Add a text column "ManagerEmail" to the Sites list and fill in each site's
+    supervisor email. (Reading the Manager Person column's email via Graph is
+    unreliable, so we match on this explicit text column.)
+
+Setup (see README.md): new "Supervisor Timesheet" app registration (SPA,
+single-tenant) -> client id; new GitHub repo + Netlify site (Git deploy only,
+because of the 'jose' dependency); paste client id into config.js; set env vars.
+
+Env vars (Netlify): TENANT_ID, CLIENT_ID, CLIENT_SECRET, SP_SITE_ID, LIST_ID
+(app-only, reused) + SUP_CLIENT_ID (the supervisor registration's client id).
+
+After deploy the sign-in screen reads "Version 1".

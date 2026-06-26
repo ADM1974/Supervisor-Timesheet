@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0f6cbd">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Approvals">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<title>Timesheet Approvals</title>
+<style>
+  :root{
+    --brand:#0f6cbd;--brand-dark:#0a4f8a;--bg:#eef1f5;--card:#ffffff;--ink:#1f2329;--muted:#6a7280;--line:#e3e7ec;
+    --amber:#b86e00;--green:#0f7b3f;--red:#b3261e;
+  }
+  *{box-sizing:border-box;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;}
+  html,body{margin:0;height:100%;}
+  body{background:var(--bg);color:var(--ink);display:flex;flex-direction:column;min-height:100%;position:relative;}
+  .appbar{background:var(--brand);color:#fff;padding:calc(env(safe-area-inset-top) + 16px) 16px 14px;display:flex;align-items:center;gap:10px;flex:0 0 auto;}
+  .appbar .ttl{font-size:16px;font-weight:600;flex:1;}
+  .appbar .user{font-size:11px;background:rgba(255,255,255,.22);padding:4px 9px;border-radius:20px;cursor:pointer;}
+  .body{flex:1;overflow-y:auto;padding:14px;max-width:560px;width:100%;margin:0 auto;}
+  .body::-webkit-scrollbar{width:0;}
+  .sh{font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--muted);text-transform:uppercase;margin:2px 2px 4px;}
+  .meta{color:var(--muted);font-size:12px;line-height:1.5;}
+  .weekhead{margin:2px 2px 12px;}
+  .weekhead .rng{font-size:15px;font-weight:600;color:var(--ink);}
+  /* ---- approval card ---- */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px 14px;margin-bottom:13px;box-shadow:0 1px 2px rgba(16,24,40,.04);}
+  .card .hd{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:8px;}
+  .card .who{font-weight:700;font-size:16px;}
+  .card .sub{font-size:12px;color:var(--muted);margin-top:2px;}
+  .card .gtot{font-weight:700;font-size:15px;color:var(--brand-dark);white-space:nowrap;}
+  .dayrow{border-top:1px solid var(--line);padding:8px 0 4px;}
+  .dayrow .dn{font-size:12.5px;font-weight:600;color:#3b424b;margin-bottom:4px;}
+  .ln{display:flex;justify-content:space-between;gap:10px;font-size:13.5px;padding:2px 0;}
+  .ln .wo{color:var(--ink);}
+  .ln .hr{color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums;}
+  .acts{display:flex;gap:10px;margin-top:12px;}
+  .acts button{flex:1;padding:12px;border-radius:9px;font-size:14.5px;font-weight:600;cursor:pointer;border:1.5px solid transparent;}
+  .acts .approve{background:var(--green);color:#fff;}
+  .acts .reject{background:#fff;color:var(--red);border-color:var(--red);}
+  .acts button:disabled{opacity:.55;cursor:default;}
+  .empty{text-align:center;color:var(--muted);font-size:15px;padding:46px 16px;}
+  .empty .big{font-size:40px;margin-bottom:8px;}
+  .loading{text-align:center;color:var(--muted);font-size:14px;padding:30px 0;}
+  .signin{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:26px 18px 22px;box-shadow:0 1px 2px rgba(16,24,40,.04);text-align:center;margin-top:30px;}
+  .signin .logo{width:64px;height:64px;border-radius:16px;margin:2px auto 14px;display:block;}
+  .signin h2{font-size:18px;font-weight:600;margin:0 0 6px;}
+  .signin .ms{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:13px;margin-top:18px;background:#fff;border:1px solid #cdd3da;border-radius:8px;font-size:15px;font-weight:600;color:#1f2329;cursor:pointer;}
+  .signin .ms:hover{background:#f4f7fb;}
+  .signin .ms .g{display:inline-grid;grid-template-columns:1fr 1fr;gap:2px;width:18px;height:18px;}
+  .signin .ms .g i{display:block;width:8px;height:8px;}
+  .signin .err{color:var(--red);font-size:13px;min-height:18px;margin-top:12px;}
+  .signin .foot{font-size:11px;color:var(--muted);margin-top:14px;}
+  .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom) + 28px);background:#1f2329;color:#fff;padding:11px 18px;border-radius:24px;font-size:13.5px;opacity:0;transition:opacity .25s;pointer-events:none;text-align:center;max-width:320px;z-index:30;}
+  .toast.show{opacity:.96;}
+  .verbadge{position:fixed;left:8px;bottom:8px;z-index:40;background:rgba(31,35,41,.5);color:#fff;font-size:10px;line-height:1;padding:4px 7px;border-radius:10px;letter-spacing:.3px;pointer-events:none;}
+  .hidden{display:none !important;}
+</style>
+</head>
+<body>
+  <div class="appbar">
+    <span class="ttl">Approvals</span>
+    <span class="user hidden" id="who" onclick="signOut()">Sign out</span>
+  </div>
+
+  <!-- ===== SIGN IN ===== -->
+  <div class="body" id="gateBody">
+    <div class="signin">
+      <img class="logo" src="icons/icon-192.png" alt="">
+      <h2>Timesheet approvals</h2>
+      <div class="meta">Sign in with your work account to review and approve the timesheets for the sites you supervise.</div>
+      <button class="ms" id="msBtn" onclick="signIn()">
+        <span class="g"><i style="background:#f25022"></i><i style="background:#7fba00"></i><i style="background:#00a4ef"></i><i style="background:#ffb900"></i></span>
+        Sign in with Microsoft
+      </button>
+      <div class="err" id="signErr"></div>
+      <div class="foot" id="signinVer" style="opacity:.55;margin-top:14px"></div>
+    </div>
+  </div>
+
+  <!-- ===== APPROVALS ===== -->
+  <div class="body hidden" id="appView">
+    <div class="weekhead" id="head"></div>
+    <div id="cards"><div class="loading">Loading approvals…</div></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <div class="verbadge" id="verbadge"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.27.0/lib/msal-browser.min.js"></script>
+<script src="config.js"></script>
+<script>
+let msalInstance=null, account=null, userName='there', GROUPS=[], SITES=[];
+const SCOPES=['openid','profile','email'];
+
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2800);}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function firstName(n){return (n||'').trim().split(/\s+/)[0]||'there';}
+function dayLabel(date){return new Date(date+'T00:00:00Z').toLocaleDateString('en-NZ',{weekday:'short',day:'numeric',month:'short',timeZone:'UTC'});}
+function weekRange(weekStart){
+  if(!weekStart) return '';
+  const start=new Date(weekStart+'T00:00:00Z');
+  const end=new Date(start.getTime()+6*86400000);
+  const iso=d=>d.toISOString().slice(0,10);
+  return dayLabel(iso(start))+' – '+dayLabel(iso(end));
+}
+function fmtHr(n){const v=Math.round((Number(n)||0)*100)/100;return (Number.isInteger(v)?v.toFixed(1):String(v))+' h';}
+
+/* ---------- Microsoft sign-in ---------- */
+(async function init(){
+  const cfg=window.SUP_CONFIG||{};
+  if(!cfg.clientId || cfg.clientId.indexOf('PASTE')===0){ document.getElementById('signErr').textContent='Sign-in not configured yet (clientId missing in config.js).'; return; }
+  try{
+    msalInstance=new msal.PublicClientApplication({
+      auth:{ clientId:cfg.clientId, authority:'https://login.microsoftonline.com/'+cfg.tenantId, redirectUri:window.location.origin },
+      cache:{ cacheLocation:'localStorage' }
+    });
+    await msalInstance.initialize();
+    const resp=await msalInstance.handleRedirectPromise();
+    account=(resp && resp.account) || msalInstance.getAllAccounts()[0] || null;
+    if(account){ msalInstance.setActiveAccount(account); afterSignIn(); }
+  }catch(e){ document.getElementById('signErr').textContent='Sign-in error — try again.'; }
+})();
+
+async function signIn(){
+  if(!msalInstance){ return; }
+  try{ await msalInstance.loginRedirect({ scopes:SCOPES }); }
+  catch(e){ document.getElementById('signErr').textContent='Couldn’t start sign-in.'; }
+}
+function signOut(){ if(msalInstance && account){ msalInstance.logoutRedirect({ account }); } }
+
+async function getToken(){
+  const res=await msalInstance.acquireTokenSilent({ account, scopes:SCOPES });
+  return res.idToken;
+}
+async function api(path, body){
+  const token=await getToken();
+  return fetch(path,{ method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+token}, body: body?JSON.stringify(body):'{}' });
+}
+
+function afterSignIn(){
+  userName=(account && (account.name || (account.idTokenClaims && account.idTokenClaims.name))) || 'there';
+  document.getElementById('gateBody').classList.add('hidden');
+  document.getElementById('appView').classList.remove('hidden');
+  const chip=document.getElementById('who'); chip.classList.remove('hidden'); chip.textContent=firstName(userName)+' · Sign out';
+  loadPending();
+}
+
+/* ---------- approvals ---------- */
+async function loadPending(){
+  document.getElementById('cards').innerHTML='<div class="loading">Loading approvals…</div>';
+  try{
+    const res=await api('/.netlify/functions/pending',{});
+    if(res.status===401){ toast('Please sign in again'); return; }
+    const data=await res.json();
+    if(!data.ok) throw new Error('load');
+    SITES=data.sites||[];
+    GROUPS=data.groups||[];
+    renderApprovals();
+  }catch(e){ document.getElementById('cards').innerHTML='<div class="loading">Couldn’t load approvals — check signal.</div>'; }
+}
+
+function renderApprovals(){
+  document.getElementById('head').innerHTML=
+    `<div class="sh">Hi ${esc(firstName(userName))} — timesheets to approve</div>`+
+    (SITES.length?`<div class="meta">${esc(SITES.join(' · '))}</div>`:'');
+
+  const wrap=document.getElementById('cards');
+
+  if(!SITES.length){
+    wrap.innerHTML=`<div class="empty"><div class="big">🏗️</div>You don’t supervise any sites yet — ask the office to set you as the site’s manager.</div>`;
+    return;
+  }
+  if(!GROUPS.length){
+    wrap.innerHTML=`<div class="empty"><div class="big">✅</div>All caught up — no timesheets waiting.</div>`;
+    return;
+  }
+  wrap.innerHTML=GROUPS.map(cardHtml).join('');
+}
+
+function cardHtml(g){
+  const days=(g.days||[]).map(d=>{
+    const lines=(d.lines||[]).map(l=>`<div class="ln"><span class="wo">${esc(l.wo||'—')}</span><span class="hr">${fmtHr(l.hr)}</span></div>`).join('');
+    return `<div class="dayrow"><div class="dn">${dayLabel(d.date)}</div>${lines}</div>`;
+  }).join('');
+  return `<div class="card" id="card-${esc(g.key)}">
+    <div class="hd">
+      <div>
+        <div class="who">${esc(g.name)}</div>
+        <div class="sub">${esc(g.site||'')}${g.weekStart?' · '+esc(weekRange(g.weekStart)):''}</div>
+      </div>
+      <div class="gtot">${fmtHr(g.total)}</div>
+    </div>
+    ${days}
+    <div class="acts">
+      <button class="approve" onclick="decide('${esc(g.key)}','approve')">Approve</button>
+      <button class="reject" onclick="decide('${esc(g.key)}','reject')">Reject</button>
+    </div>
+  </div>`;
+}
+
+async function decide(key, action){
+  const g=GROUPS.find(x=>x.key===key);
+  if(!g) return;
+  let reason='';
+  if(action==='reject'){
+    reason=(prompt('Reason for rejecting '+g.name+'’s timesheet?')||'').trim();
+    if(!reason){ return; }
+  }
+  const card=document.getElementById('card-'+cssId(key));
+  const btns=card?card.querySelectorAll('button'):[];
+  btns.forEach(b=>b.disabled=true);
+  try{
+    const res=await api('/.netlify/functions/decide',{ ids:g.ids, action, reason });
+    if(res.status===401){ toast('Please sign in again'); btns.forEach(b=>b.disabled=false); return; }
+    const data=await res.json();
+    if(!data.ok) throw new Error('decide');
+    GROUPS=GROUPS.filter(x=>x.key!==key);
+    renderApprovals();
+    toast(action==='approve'?`Approved ${g.name} — ${data.updated} ${data.updated===1?'entry':'entries'}`:`Rejected ${g.name}`);
+  }catch(e){ toast('Couldn’t save — check signal and try again'); btns.forEach(b=>b.disabled=false); }
+}
+function cssId(key){ return String(key).replace(/"/g,'&quot;'); }
+
+/* Version badge (shown on every screen) + always-check-for-updates on load */
+const APP_VERSION='1.2';
+document.getElementById('verbadge').textContent='v'+APP_VERSION;
+document.getElementById('signinVer').textContent='Version '+APP_VERSION;
+if('serviceWorker' in navigator && location.hostname!=='localhost' && location.hostname!=='127.0.0.1'){
+  navigator.serviceWorker.register('sw.js').then(reg=>{ try{ reg.update(); }catch(e){} }).catch(()=>{});
+}
+</script>
+</body>
+</html>

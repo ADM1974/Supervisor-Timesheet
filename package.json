@@ -1,0 +1,10 @@
+{
+  "name": "supervisor-timesheet",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Supervisor approval PWA with Microsoft (365) sign-in, approving/rejecting submitted rows in the shared Timesheets SharePoint list.",
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "jose": "^5.9.6"
+  }
+}
