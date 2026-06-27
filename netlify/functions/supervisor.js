@@ -74,10 +74,10 @@ function emailFromName(name) {
   return (first && last) ? `${first}.${last}@ael.co` : '';
 }
 
-// The sites this supervisor manages. Match the signed-in supervisor's email to each
-// site's manager: by the manager's NAME (a text "Manager"/"ManagerName" column →
-// email generated from the company format), OR an explicit "ManagerEmail" column
-// which OVERRIDES the generated one. Returns the site NAMES (Title).
+// The sites this supervisor manages. A site can have MULTIPLE approvers (for cover):
+// list names in "ManagerName" separated by ';' (each → email via the company format),
+// and/or explicit emails in "ManagerEmail" (also ';'-separated). A site matches if the
+// signed-in supervisor's email is ANY of those. Returns the site NAMES (Title).
 async function getSupervisorSites(token, email) {
   const want = String(email || '').trim().toLowerCase();
   if (!want) return [];
@@ -88,12 +88,15 @@ async function getSupervisorSites(token, email) {
   if (!r.ok) throw new Error('graph sites ' + r.status + ' ' + (await r.text()));
   const rows = (await r.json()).value || [];
 
+  const split = s => String(s || '').split(/[;\n]/).map(x => x.trim()).filter(Boolean);
   return rows.filter(it => {
     const f = it.fields || {};
-    const override = String(f.ManagerEmail || '').trim().toLowerCase();
-    if (override) return override === want;                         // manual override wins
-    const gen = emailFromName(f.Manager || f.ManagerName || '');    // else generate from the name
-    return !!gen && gen === want;
+    const emails = new Set();
+    for (const e of split(f.ManagerEmail)) emails.add(e.toLowerCase());       // explicit override emails
+    for (const n of split(f.Manager || f.ManagerName)) {                      // names → generated emails
+      const g = emailFromName(n); if (g) emails.add(g);
+    }
+    return emails.has(want);
   })
     .map(it => String((it.fields || {}).Title || '').trim())
     .filter(Boolean)
