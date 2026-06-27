@@ -99,7 +99,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.27.0/lib/msal-browser.min.js"></script>
 <script src="config.js"></script>
 <script>
-let msalInstance=null, account=null, userName='there', GROUPS=[], SITES=[];
+let msalInstance=null, account=null, userName='there', userEmail='', GROUPS=[], SITES=[];
 const SCOPES=['openid','profile','email'];
 
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2800);}
@@ -149,6 +149,7 @@ async function api(path, body){
 
 function afterSignIn(){
   userName=(account && (account.name || (account.idTokenClaims && account.idTokenClaims.name))) || 'there';
+  userEmail=(account && (account.username || (account.idTokenClaims && account.idTokenClaims.preferred_username))) || '';
   document.getElementById('gateBody').classList.add('hidden');
   document.getElementById('appView').classList.remove('hidden');
   const chip=document.getElementById('who'); chip.classList.remove('hidden'); chip.textContent=firstName(userName)+' · Sign out';
@@ -172,12 +173,13 @@ async function loadPending(){
 function renderApprovals(){
   document.getElementById('head').innerHTML=
     `<div class="sh">Hi ${esc(firstName(userName))} — timesheets to approve</div>`+
-    (SITES.length?`<div class="meta">${esc(SITES.join(' · '))}</div>`:'');
+    (userEmail?`<div class="meta">Signed in as ${esc(userEmail)}</div>`:'')+
+    (SITES.length?`<div class="meta">Your sites: ${esc(SITES.join(' · '))}</div>`:'');
 
   const wrap=document.getElementById('cards');
 
   if(!SITES.length){
-    wrap.innerHTML=`<div class="empty"><div class="big">🏗️</div>You don’t supervise any sites yet — ask the office to set you as the site’s manager.</div>`;
+    wrap.innerHTML=`<div class="empty"><div class="big">🏗️</div>No sites are linked to <b>${esc(userEmail||'your account')}</b> yet.<br><br>On the Sites list, set <b>ManagerName</b> so it forms this email (first-initial.surname@ael.co), or add a <b>ManagerEmail</b> column with this exact address.</div>`;
     return;
   }
   if(!GROUPS.length){
@@ -232,7 +234,7 @@ async function decide(key, action){
 function cssId(key){ return String(key).replace(/"/g,'&quot;'); }
 
 /* Version badge (shown on every screen) + always-check-for-updates on load */
-const APP_VERSION='1.6';
+const APP_VERSION='1.7';
 document.getElementById('verbadge').textContent='v'+APP_VERSION;
 document.getElementById('signinVer').textContent='Version '+APP_VERSION;
 
