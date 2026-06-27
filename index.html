@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#0f6cbd">
+<meta name="theme-color" content="#6d28d9">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -13,7 +13,7 @@
 <title>Timesheet Approvals</title>
 <style>
   :root{
-    --brand:#0f6cbd;--brand-dark:#0a4f8a;--bg:#eef1f5;--card:#ffffff;--ink:#1f2329;--muted:#6a7280;--line:#e3e7ec;
+    --brand:#6d28d9;--brand-dark:#4c1d95;--bg:#f1eef7;--card:#ffffff;--ink:#1f2329;--muted:#6a7280;--line:#e6e2ee;
     --amber:#b86e00;--green:#0f7b3f;--red:#b3261e;
   }
   *{box-sizing:border-box;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;}
@@ -232,7 +232,7 @@ async function decide(key, action){
 function cssId(key){ return String(key).replace(/"/g,'&quot;'); }
 
 /* Version badge (shown on every screen) + always-check-for-updates on load */
-const APP_VERSION='1.4';
+const APP_VERSION='1.5';
 document.getElementById('verbadge').textContent='v'+APP_VERSION;
 document.getElementById('signinVer').textContent='Version '+APP_VERSION;
 
