@@ -43,6 +43,11 @@
   .payrollbtn{margin-top:12px;width:100%;padding:11px;border:1.5px solid var(--brand);background:#fff;color:var(--brand-dark);border-radius:9px;font-size:13.5px;font-weight:600;cursor:pointer;}
   .payrollbtn:active{background:#f5efef;}
   .payrollbtn:disabled{opacity:.55;cursor:default;}
+  .worow{display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding:7px 0;font-size:13.5px;}
+  .wodel{border:none;background:none;color:var(--red);font-size:15px;cursor:pointer;padding:0 4px;line-height:1;}
+  .woadd{display:flex;gap:7px;margin-top:9px;}
+  .woadd input{flex:1;border:1px solid var(--line);border-radius:7px;padding:8px 9px;font-size:13px;}
+  .woadd button{background:var(--brand);color:#fff;border:none;border-radius:7px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;}
   .acts{display:flex;gap:10px;margin-top:12px;}
   .acts button{flex:1;padding:12px;border-radius:9px;font-size:14.5px;font-weight:600;cursor:pointer;border:1.5px solid transparent;}
   .acts .approve{background:var(--green);color:#fff;}
@@ -180,7 +185,7 @@ function renderApprovals(){
     `<div class="sh">Hi ${esc(firstName(userName))} — timesheets to approve</div>`+
     (userEmail?`<div class="meta">Signed in as ${esc(userEmail)}</div>`:'')+
     (SITES.length?`<div class="meta">Your sites: ${esc(SITES.join(' · '))}</div>`:'')+
-    (SITES.length?`<button class="payrollbtn" onclick="sendPayroll('last')">📧 Email last week’s payroll report</button><div style="text-align:center;margin-top:7px"><a href="#" onclick="event.preventDefault();sendPayroll('current')" style="font-size:12px;color:var(--brand-dark)">…or send this week so far (for testing)</a></div>`:'');
+    (SITES.length?`<button class="payrollbtn" onclick="sendPayroll('last')">📧 Email last week’s payroll report</button><div style="text-align:center;margin-top:7px"><a href="#" onclick="event.preventDefault();sendPayroll('current')" style="font-size:12px;color:var(--brand-dark)">…or send this week so far (for testing)</a></div><div style="text-align:center;margin-top:10px"><a href="#" onclick="event.preventDefault();loadWorkOrders()" style="font-size:12.5px;color:var(--brand-dark);font-weight:600">🛠 Manage work orders</a></div>`:'');
 
   const wrap=document.getElementById('cards');
 
@@ -216,6 +221,53 @@ function cardHtml(g){
       <button class="reject" onclick="decide('${esc(g.key)}','reject')">Reject</button>
     </div>
   </div>`;
+}
+
+/* ---------- manage work orders (per the supervisor's sites) ---------- */
+let WO = { sites:[], workOrders:[] };
+function woInId(site){ return 'woin_'+String(site).replace(/[^a-z0-9]/gi,'_'); }
+async function loadWorkOrders(){
+  document.getElementById('head').innerHTML=`<div class="sh">Work orders</div><div class="meta">Add or remove the jobs that appear in the timesheet apps for your sites.</div>`;
+  document.getElementById('cards').innerHTML='<div class="loading">Loading…</div>';
+  try{
+    const res=await api('/.netlify/functions/workorders',{ action:'list' });
+    if(res.status===401){ toast('Please sign in again'); return; }
+    const data=await res.json();
+    if(!data.ok) throw new Error(data.error||'load');
+    WO=data; renderWorkOrders();
+  }catch(e){ document.getElementById('cards').innerHTML='<div class="empty"><div class="big">⚠️</div>Couldn’t load work orders — '+esc((e&&e.message)||'try again')+'</div>'; }
+}
+function renderWorkOrders(){
+  const bySite={};
+  (WO.sites||[]).forEach(s=>bySite[s]=[]);
+  (WO.workOrders||[]).forEach(w=>{ (bySite[w.site]=bySite[w.site]||[]).push(w); });
+  let html=(WO.sites||[]).map(site=>{
+    const rows=(bySite[site]||[]).map(w=>`<div class="worow"><span>${esc(w.title)}</span><button class="wodel" onclick="removeWO('${esc(String(w.id))}')" title="Remove">✕</button></div>`).join('')
+      || '<div class="meta" style="padding:5px 0 2px">No work orders yet.</div>';
+    return `<div class="card"><div class="who">${esc(site)}</div>${rows}<div class="woadd"><input id="${woInId(site)}" placeholder="New work order…" maxlength="200"><button onclick="addWO('${esc(site)}')">Add</button></div></div>`;
+  }).join('');
+  html+=`<button class="payrollbtn" onclick="loadPending()">← Back to approvals</button>`;
+  document.getElementById('cards').innerHTML=html;
+}
+async function addWO(site){
+  const inp=document.getElementById(woInId(site));
+  const title=((inp&&inp.value)||'').trim();
+  if(!title){ if(inp) inp.focus(); return; }
+  try{
+    const res=await api('/.netlify/functions/workorders',{ action:'add', site, title });
+    const data=await res.json();
+    if(!data.ok) throw new Error(data.error||'add');
+    toast('Added: '+title); loadWorkOrders();
+  }catch(e){ toast('Couldn’t add — '+((e&&e.message)||'try again')); }
+}
+async function removeWO(id){
+  if(!confirm('Remove this work order from the list?')) return;
+  try{
+    const res=await api('/.netlify/functions/workorders',{ action:'remove', id });
+    const data=await res.json();
+    if(!data.ok) throw new Error(data.error||'remove');
+    toast('Removed'); loadWorkOrders();
+  }catch(e){ toast('Couldn’t remove — '+((e&&e.message)||'try again')); }
 }
 
 async function sendPayroll(which){
@@ -264,7 +316,7 @@ async function decide(key, action){
 function cssId(key){ return String(key).replace(/"/g,'&quot;'); }
 
 /* Version badge (shown on every screen) + always-check-for-updates on load */
-const APP_VERSION='2.7';
+const APP_VERSION='2.8';
 document.getElementById('verbadge').textContent='v'+APP_VERSION;
 document.getElementById('signinVer').textContent='Version '+APP_VERSION;
 
