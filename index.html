@@ -179,7 +179,7 @@ function renderApprovals(){
     `<div class="sh">Hi ${esc(firstName(userName))} — timesheets to approve</div>`+
     (userEmail?`<div class="meta">Signed in as ${esc(userEmail)}</div>`:'')+
     (SITES.length?`<div class="meta">Your sites: ${esc(SITES.join(' · '))}</div>`:'')+
-    (SITES.length?`<button class="payrollbtn" onclick="sendPayroll()">📧 Email last week’s payroll report</button>`:'');
+    (SITES.length?`<button class="payrollbtn" onclick="sendPayroll('last')">📧 Email last week’s payroll report</button><div style="text-align:center;margin-top:7px"><a href="#" onclick="event.preventDefault();sendPayroll('current')" style="font-size:12px;color:var(--brand-dark)">…or send this week so far (for testing)</a></div>`:'');
 
   const wrap=document.getElementById('cards');
 
@@ -217,11 +217,13 @@ function cardHtml(g){
   </div>`;
 }
 
-async function sendPayroll(){
-  if(!confirm('Email last week’s APPROVED hours to payroll for your site(s)? The supervisor is cc’d.')) return;
+async function sendPayroll(which){
+  which = which==='current' ? 'current' : 'last';
+  const label = which==='current' ? 'THIS week so far' : 'last week';
+  if(!confirm('Email '+label+'’s APPROVED hours to payroll for your site(s)? The supervisor is cc’d.')) return;
   const btn=document.querySelector('.payrollbtn'); if(btn){ btn.disabled=true; btn.textContent='Sending…'; }
   try{
-    const res=await api('/.netlify/functions/report',{ which:'last' });
+    const res=await api('/.netlify/functions/report',{ which });
     if(res.status===401){ toast('Please sign in again'); return; }
     const data=await res.json();
     if(!data.ok) throw new Error(data.error||'failed');
@@ -261,7 +263,7 @@ async function decide(key, action){
 function cssId(key){ return String(key).replace(/"/g,'&quot;'); }
 
 /* Version badge (shown on every screen) + always-check-for-updates on load */
-const APP_VERSION='2.2';
+const APP_VERSION='2.3';
 document.getElementById('verbadge').textContent='v'+APP_VERSION;
 document.getElementById('signinVer').textContent='Version '+APP_VERSION;
 
