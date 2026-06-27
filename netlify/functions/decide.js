@@ -36,24 +36,30 @@ exports.handler = async (event) => {
     if (!targets.length) return bad('nothing to update');
 
     const nowIso = new Date().toISOString();
+    const when = nowIso.slice(0, 16).replace('T', ' ');                       // e.g. 2026-06-27 14:32
+    const who = user.name ? (user.name + ' <' + user.email + '>') : user.email;
     let updated = 0;
     for (const id of targets) {
-      let fields;
-      if (action === 'approve') {
-        const prev = String((allowed.get(id).fields || {}).Notes || '').trim();
-        const note = 'Approved by ' + user.email;
-        fields = {
-          Status: 'Approved',
-          ApprovedDate: nowIso,
-          Notes: prev ? (prev + ' · ' + note) : note,
-        };
-      } else {
-        fields = {
-          Status: 'Rejected',
-          RejectionReason: reason,
-        };
+      const prev = String((allowed.get(id).fields || {}).Notes || '').trim();
+      const verb = action === 'approve' ? 'Approved' : 'Rejected';
+      const stamp = verb + ' by ' + who + ' on ' + when + (action === 'reject' ? ' — ' + reason : '');
+      const notes = prev ? (prev + ' · ' + stamp) : stamp;
+      const full = {
+        Status: action === 'approve' ? 'Approved' : 'Rejected',
+        ApprovedBy: who,                 // who actioned this row (approver, or rejecter)
+        ApprovedDate: nowIso,
+        Notes: notes,
+        ...(action === 'reject' ? { RejectionReason: reason } : {}),
+      };
+      try {
+        await updateItem(token, id, full);
+      } catch (e) {
+        // The dedicated columns (ApprovedBy/ApprovedDate/RejectionReason) may not
+        // exist on the Timesheets list yet — fall back so the decision still lands,
+        // with who/when preserved in the Notes field regardless.
+        console.warn('decide: full update failed, retrying minimal —', e.message);
+        await updateItem(token, id, { Status: full.Status, Notes: notes });
       }
-      await updateItem(token, id, fields);
       updated++;
     }
 
