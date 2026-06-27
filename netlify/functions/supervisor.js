@@ -92,14 +92,17 @@ function ownsRow(fields, user) {
   return !!gen && gen === String((user && user.email) || '').trim().toLowerCase();
 }
 
-// The sites this supervisor manages. A site can have MULTIPLE approvers (for cover):
-// list names in "ManagerName" separated by ';' (each → email via the company format),
-// and/or explicit emails in "ManagerEmail" (also ';'-separated). A site matches if the
-// signed-in supervisor's email is ANY of those. Returns the site NAMES (Title).
+// The sites a person can approve for. Approvers come from the Sites list:
+//   - "ManagerName" (or "Manager") + optional "ManagerEmail"  — the site's supervisors
+//   - "SeniorApprover"             + optional "SeniorApproverEmail" — the site's senior approver(s)
+// Each holds name(s) (';'-separated) turned into emails via the company format, or
+// explicit email(s). A site matches if the signed-in email is ANY of them. Because
+// nobody can approve their OWN sheet, the supervisor and senior approver cover each
+// other. Returns the site NAMES (Title). (Env SENIOR_APPROVERS = optional global.)
 async function getSupervisorSites(token, email) {
   const want = String(email || '').trim().toLowerCase();
   if (!want) return [];
-  if (isSenior(want)) {                                   // senior approver → every active site
+  if (isSenior(want)) {                                   // env global approver → every active site
     const detailed = await getSitesDetailed(token);
     return Object.keys(detailed).sort((a, b) => a.localeCompare(b));
   }
@@ -111,15 +114,15 @@ async function getSupervisorSites(token, email) {
   const rows = (await r.json()).value || [];
 
   const split = s => String(s || '').split(/[;\n]/).map(x => x.trim()).filter(Boolean);
-  return rows.filter(it => {
-    const f = it.fields || {};
-    const emails = new Set();
-    for (const e of split(f.ManagerEmail)) emails.add(e.toLowerCase());       // explicit override emails
-    for (const n of split(f.Manager || f.ManagerName)) {                      // names → generated emails
-      const g = emailFromName(n); if (g) emails.add(g);
-    }
-    return emails.has(want);
-  })
+  const emailsOf = f => {
+    const set = new Set();
+    for (const e of split(f.ManagerEmail)) set.add(e.toLowerCase());                          // supervisor, explicit
+    for (const n of split(f.Manager || f.ManagerName)) { const g = emailFromName(n); if (g) set.add(g); } // supervisor, by name
+    for (const e of split(f.SeniorApproverEmail)) set.add(e.toLowerCase());                   // senior, explicit
+    for (const n of split(f.SeniorApprover)) { const g = emailFromName(n); if (g) set.add(g); }           // senior, by name
+    return set;
+  };
+  return rows.filter(it => emailsOf(it.fields || {}).has(want))
     .map(it => String((it.fields || {}).Title || '').trim())
     .filter(Boolean)
     .sort((a, b) => a.localeCompare(b));

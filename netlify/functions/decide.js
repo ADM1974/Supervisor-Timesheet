@@ -31,8 +31,7 @@ exports.handler = async (event) => {
     // Re-fetch what's actually Submitted for this supervisor's sites; only ids
     // present in that set are allowed to be actioned.
     const rows = await getSubmittedForSites(token, sites);
-    const senior = isSenior(user.email);
-    const allowed = new Map(rows.filter(it => senior || !ownsRow(it.fields, user)).map(it => [String(it.id), it]));
+    const allowed = new Map(rows.filter(it => !ownsRow(it.fields, user)).map(it => [String(it.id), it]));
     const targets = ids.filter(id => allowed.has(id));
     if (!targets.length) return bad('nothing to update');
 

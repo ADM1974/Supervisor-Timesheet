@@ -29,11 +29,10 @@ exports.handler = async (event) => {
 
     // Group by person + Monday-based week. ContractorId is the stable per-person
     // key; fall back to the name if it's missing on a row.
-    const senior = isSenior(user.email);
     const groups = {};
     for (const it of rows) {
       const f = it.fields || {};
-      if (!senior && ownsRow(f, user)) continue;          // a supervisor can't approve their own
+      if (ownsRow(f, user)) continue;                     // nobody approves their own timesheet
       const person = String(f.ContractorId || f.Title || '').trim() || 'unknown';
       const date = String(f.EntryDate || '').slice(0, 10);
       const wk = weekStartOf(date) || (String(f.BatchID || '').trim() || date);
