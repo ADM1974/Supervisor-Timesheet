@@ -39,6 +39,7 @@
   .ln{display:flex;justify-content:space-between;gap:10px;font-size:13.5px;padding:2px 0;}
   .ln .wo{color:var(--ink);}
   .ln .hr{color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums;}
+  .ln .tag{font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--brand-dark);background:#f3e7e7;border-radius:10px;padding:2px 8px;white-space:nowrap;align-self:center;}
   .acts{display:flex;gap:10px;margin-top:12px;}
   .acts button{flex:1;padding:12px;border-radius:9px;font-size:14.5px;font-weight:600;cursor:pointer;border:1.5px solid transparent;}
   .acts .approve{background:var(--green);color:#fff;}
@@ -191,7 +192,9 @@ function renderApprovals(){
 
 function cardHtml(g){
   const days=(g.days||[]).map(d=>{
-    const lines=(d.lines||[]).map(l=>`<div class="ln"><span class="wo">${esc(l.wo||'—')}</span><span class="hr">${fmtHr(l.hr)}</span></div>`).join('');
+    const lines=(d.lines||[]).slice().sort((a,b)=>(a.allow?1:0)-(b.allow?1:0)).map(l=> l.allow
+      ? `<div class="ln"><span class="wo">${esc(l.allow)}</span><span class="tag">allowance</span></div>`
+      : `<div class="ln"><span class="wo">${esc(l.wo||'—')}</span><span class="hr">${fmtHr(l.hr)}</span></div>`).join('');
     return `<div class="dayrow"><div class="dn">${dayLabel(d.date)}</div>${lines}</div>`;
   }).join('');
   return `<div class="card" id="card-${esc(g.key)}">
@@ -228,13 +231,14 @@ async function decide(key, action){
     if(!data.ok) throw new Error('decide');
     GROUPS=GROUPS.filter(x=>x.key!==key);
     renderApprovals();
-    toast(action==='approve'?`Approved ${g.name} — ${data.updated} ${data.updated===1?'entry':'entries'}`:`Rejected ${g.name}`);
+    const by=userEmail?(' · by '+userEmail):'';
+    toast(action==='approve'?`Approved ${g.name} — ${data.updated} ${data.updated===1?'entry':'entries'}${by}`:`Rejected ${g.name}${by}`);
   }catch(e){ toast('Couldn’t save — check signal and try again'); btns.forEach(b=>b.disabled=false); }
 }
 function cssId(key){ return String(key).replace(/"/g,'&quot;'); }
 
 /* Version badge (shown on every screen) + always-check-for-updates on load */
-const APP_VERSION='1.9';
+const APP_VERSION='2.0';
 document.getElementById('verbadge').textContent='v'+APP_VERSION;
 document.getElementById('signinVer').textContent='Version '+APP_VERSION;
 

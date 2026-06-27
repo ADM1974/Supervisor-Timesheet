@@ -46,7 +46,10 @@ exports.handler = async (event) => {
       g.total += hr;
       if (!g.weekStart && weekStartOf(date)) g.weekStart = weekStartOf(date);
       if (!g.byDate[date]) g.byDate[date] = [];
-      g.byDate[date].push({ wo: String(f.WorkOrder || ''), hr });
+      const allow = (String(f.RowType || '').toLowerCase() === 'allowance' || f.Allowance)
+        ? (String(f.Allowance || '').trim() || 'Allowance')
+        : '';
+      g.byDate[date].push({ wo: String(f.WorkOrder || ''), hr, allow });
     }
 
     const out = Object.values(groups).map(g => ({
