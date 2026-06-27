@@ -45,9 +45,9 @@
   .payrollbtn:disabled{opacity:.55;cursor:default;}
   .worow{display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding:7px 0;font-size:13.5px;}
   .wodel{border:none;background:none;color:var(--red);font-size:15px;cursor:pointer;padding:0 4px;line-height:1;}
-  .woadd{display:flex;gap:7px;margin-top:9px;}
-  .woadd input{flex:1;border:1px solid var(--line);border-radius:7px;padding:8px 9px;font-size:13px;}
-  .woadd button{background:var(--brand);color:#fff;border:none;border-radius:7px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;}
+  .woadd-lbl{font-size:11.5px;color:var(--muted);margin-top:10px;font-weight:600;}
+  .woadd-lbl span{font-weight:400;}
+  .wota{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:7px;padding:8px 9px;font-size:13px;font-family:inherit;resize:vertical;margin-top:5px;}
   .acts{display:flex;gap:10px;margin-top:12px;}
   .acts button{flex:1;padding:12px;border-radius:9px;font-size:14.5px;font-weight:600;cursor:pointer;border:1.5px solid transparent;}
   .acts .approve{background:var(--green);color:#fff;}
@@ -244,21 +244,30 @@ function renderWorkOrders(){
   let html=(WO.sites||[]).map(site=>{
     const rows=(bySite[site]||[]).map(w=>`<div class="worow"><span>${esc(w.title)}</span><button class="wodel" onclick="removeWO('${esc(String(w.id))}')" title="Remove">✕</button></div>`).join('')
       || '<div class="meta" style="padding:5px 0 2px">No work orders yet.</div>';
-    return `<div class="card"><div class="who">${esc(site)}</div>${rows}<div class="woadd"><input id="${woInId(site)}" placeholder="New work order…" maxlength="200"><button onclick="addWO('${esc(site)}')">Add</button></div></div>`;
+    return `<div class="card"><div class="who">${esc(site)}</div>${rows}
+      <div class="woadd-lbl">Add work orders <span>— one per line</span></div>
+      <textarea id="${woInId(site)}" class="wota" rows="3" placeholder="WO-1234 — description&#10;WO-5678 — description"></textarea></div>`;
   }).join('');
-  html+=`<button class="payrollbtn" onclick="loadPending()">← Back to approvals</button>`;
+  html+=`<button class="payrollbtn" id="woSaveBtn" onclick="saveWorkOrders()">＋ Save new work orders</button>`;
+  html+=`<button class="payrollbtn" style="margin-top:8px;border-color:var(--line);color:var(--muted)" onclick="loadPending()">← Back to approvals</button>`;
   document.getElementById('cards').innerHTML=html;
 }
-async function addWO(site){
-  const inp=document.getElementById(woInId(site));
-  const title=((inp&&inp.value)||'').trim();
-  if(!title){ if(inp) inp.focus(); return; }
+async function saveWorkOrders(){
+  const items=[];
+  (WO.sites||[]).forEach(site=>{
+    const ta=document.getElementById(woInId(site));
+    if(!ta) return;
+    ta.value.split(/\r?\n/).map(s=>s.trim()).filter(Boolean).forEach(title=>items.push({site,title}));
+  });
+  if(!items.length){ toast('Type some work orders first — one per line.'); return; }
+  const btn=document.getElementById('woSaveBtn'); if(btn){ btn.disabled=true; btn.textContent='Saving…'; }
   try{
-    const res=await api('/.netlify/functions/workorders',{ action:'add', site, title });
+    const res=await api('/.netlify/functions/workorders',{ action:'addmany', items });
     const data=await res.json();
-    if(!data.ok) throw new Error(data.error||'add');
-    toast('Added: '+title); loadWorkOrders();
-  }catch(e){ toast('Couldn’t add — '+((e&&e.message)||'try again')); }
+    if(!data.ok) throw new Error(data.error||'save');
+    toast('Added '+data.created+' work order'+(data.created===1?'':'s'));
+    loadWorkOrders();
+  }catch(e){ toast('Couldn’t save — '+((e&&e.message)||'try again')); if(btn){ btn.disabled=false; btn.textContent='＋ Save new work orders'; } }
 }
 async function removeWO(id){
   if(!confirm('Remove this work order from the list?')) return;
@@ -316,7 +325,7 @@ async function decide(key, action){
 function cssId(key){ return String(key).replace(/"/g,'&quot;'); }
 
 /* Version badge (shown on every screen) + always-check-for-updates on load */
-const APP_VERSION='2.9';
+const APP_VERSION='3.0';
 document.getElementById('verbadge').textContent='v'+APP_VERSION;
 document.getElementById('signinVer').textContent='Version '+APP_VERSION;
 

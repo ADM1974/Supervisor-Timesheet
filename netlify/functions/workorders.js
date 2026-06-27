@@ -84,6 +84,22 @@ exports.handler = async (event) => {
       return { statusCode: 200, headers, body: '{"ok":true}' };
     }
 
+    if (action === 'addmany') {
+      const items = Array.isArray(data.items) ? data.items : [];
+      let created = 0;
+      for (const it of items.slice(0, 200)) {
+        const site = String(it.site || '').trim();
+        const title = String(it.title || '').trim().slice(0, 200);
+        if (!title || !siteSet.has(site.toLowerCase())) continue;
+        const fields = { Title: title, Active: true };
+        if (sc.isLookup) { const sid = sm.byName[site.toLowerCase()]; if (!sid) continue; fields[sc.name + 'LookupId'] = sid; }
+        else fields[sc.name] = site;
+        const r = await fetch(itemsUrl, { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ fields }) });
+        if (r.ok) created++;
+      }
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, created }) };
+    }
+
     if (action === 'remove') {
       const id = String(data.id || '').trim();
       if (!id) return { statusCode: 400, headers, body: '{"ok":false,"error":"no id"}' };
