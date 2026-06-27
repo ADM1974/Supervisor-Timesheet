@@ -87,7 +87,8 @@
         Sign in with Microsoft
       </button>
       <div class="err" id="signErr"></div>
-      <div class="foot" id="signinVer" style="opacity:.55;margin-top:14px"></div>
+      <div class="foot" style="margin-top:16px"><a href="guide.html" target="_blank" rel="noopener" style="color:var(--brand-dark);font-weight:600;text-decoration:none">How the timesheet system works →</a></div>
+      <div class="foot" id="signinVer" style="opacity:.55;margin-top:10px"></div>
     </div>
   </div>
 
@@ -263,7 +264,7 @@ async function decide(key, action){
 function cssId(key){ return String(key).replace(/"/g,'&quot;'); }
 
 /* Version badge (shown on every screen) + always-check-for-updates on load */
-const APP_VERSION='2.6';
+const APP_VERSION='2.7';
 document.getElementById('verbadge').textContent='v'+APP_VERSION;
 document.getElementById('signinVer').textContent='Version '+APP_VERSION;
 
