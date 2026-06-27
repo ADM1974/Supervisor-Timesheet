@@ -74,6 +74,24 @@ function emailFromName(name) {
   return (first && last) ? `${first}.${last}@ael.co` : '';
 }
 
+// Senior approvers (env SENIOR_APPROVERS, ';'-separated emails) can authorise ANY
+// site's timesheets — including supervisors' own, which supervisors can't self-approve.
+function isSenior(email) {
+  const set = new Set(String(process.env.SENIOR_APPROVERS || '').split(/[;,\n]/).map(s => s.trim().toLowerCase()).filter(Boolean));
+  return set.has(String(email || '').trim().toLowerCase());
+}
+
+// True if a Timesheets row was submitted by THIS signed-in person (so they can't
+// approve their own): matches the row's ContractorId to their 365 id, or the
+// worker's name to their email.
+function ownsRow(fields, user) {
+  const f = fields || {};
+  const cid = String(f.ContractorId || '').trim();
+  if (cid && user && cid === String(user.id || '').trim()) return true;
+  const gen = emailFromName(f.Title);
+  return !!gen && gen === String((user && user.email) || '').trim().toLowerCase();
+}
+
 // The sites this supervisor manages. A site can have MULTIPLE approvers (for cover):
 // list names in "ManagerName" separated by ';' (each → email via the company format),
 // and/or explicit emails in "ManagerEmail" (also ';'-separated). A site matches if the
@@ -81,6 +99,10 @@ function emailFromName(name) {
 async function getSupervisorSites(token, email) {
   const want = String(email || '').trim().toLowerCase();
   if (!want) return [];
+  if (isSenior(want)) {                                   // senior approver → every active site
+    const detailed = await getSitesDetailed(token);
+    return Object.keys(detailed).sort((a, b) => a.localeCompare(b));
+  }
   const sitesListId = await findListId(token, 'Sites');
   if (!sitesListId) throw new Error('Sites list not found');
 
@@ -203,3 +225,6 @@ exports.getSitesDetailed = getSitesDetailed;
 exports.getApprovedForSites = getApprovedForSites;
 exports.nzToday = nzToday;
 exports.weekForClose = weekForClose;
+exports.isSenior = isSenior;
+exports.ownsRow = ownsRow;
+exports.emailFromName = emailFromName;

@@ -1,7 +1,7 @@
 // Returns the timesheets waiting for THIS supervisor, grouped one card per
 // person's submitted week. Each group: name, site(s), week range, each day's
 // work-order lines + hours, the group total, and the row ids to action.
-const { getAppToken, validateSupervisorToken, getSupervisorSites, getSubmittedForSites } = require('./supervisor');
+const { getAppToken, validateSupervisorToken, getSupervisorSites, getSubmittedForSites, isSenior, ownsRow } = require('./supervisor');
 
 // Monday-based week start (UTC ISO date) for a given EntryDate.
 function weekStartOf(dateStr) {
@@ -29,9 +29,11 @@ exports.handler = async (event) => {
 
     // Group by person + Monday-based week. ContractorId is the stable per-person
     // key; fall back to the name if it's missing on a row.
+    const senior = isSenior(user.email);
     const groups = {};
     for (const it of rows) {
       const f = it.fields || {};
+      if (!senior && ownsRow(f, user)) continue;          // a supervisor can't approve their own
       const person = String(f.ContractorId || f.Title || '').trim() || 'unknown';
       const date = String(f.EntryDate || '').slice(0, 10);
       const wk = weekStartOf(date) || (String(f.BatchID || '').trim() || date);

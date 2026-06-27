@@ -4,7 +4,7 @@
 // Security: we re-check server-side that EVERY id is currently a Submitted row
 // whose Site is one the supervisor manages — so a supervisor can't approve rows
 // outside their sites even if they post arbitrary ids.
-const { getAppToken, validateSupervisorToken, getSupervisorSites, getSubmittedForSites, updateItem } = require('./supervisor');
+const { getAppToken, validateSupervisorToken, getSupervisorSites, getSubmittedForSites, updateItem, isSenior, ownsRow } = require('./supervisor');
 
 exports.handler = async (event) => {
   const headers = { 'Content-Type': 'application/json' };
@@ -31,7 +31,8 @@ exports.handler = async (event) => {
     // Re-fetch what's actually Submitted for this supervisor's sites; only ids
     // present in that set are allowed to be actioned.
     const rows = await getSubmittedForSites(token, sites);
-    const allowed = new Map(rows.map(it => [String(it.id), it]));
+    const senior = isSenior(user.email);
+    const allowed = new Map(rows.filter(it => senior || !ownsRow(it.fields, user)).map(it => [String(it.id), it]));
     const targets = ids.filter(id => allowed.has(id));
     if (!targets.length) return bad('nothing to update');
 
