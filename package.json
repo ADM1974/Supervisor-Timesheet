@@ -5,6 +5,8 @@
   "description": "Supervisor approval PWA with Microsoft (365) sign-in, approving/rejecting submitted rows in the shared Timesheets SharePoint list.",
   "engines": { "node": ">=18" },
   "dependencies": {
-    "jose": "^5.9.6"
+    "jose": "^5.9.6",
+    "exceljs": "^4.4.0",
+    "pdf-lib": "^1.17.1"
   }
 }

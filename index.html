@@ -40,6 +40,9 @@
   .ln .wo{color:var(--ink);}
   .ln .hr{color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums;}
   .ln .tag{font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--brand-dark);background:#f3e7e7;border-radius:10px;padding:2px 8px;white-space:nowrap;align-self:center;}
+  .payrollbtn{margin-top:12px;width:100%;padding:11px;border:1.5px solid var(--brand);background:#fff;color:var(--brand-dark);border-radius:9px;font-size:13.5px;font-weight:600;cursor:pointer;}
+  .payrollbtn:active{background:#f5efef;}
+  .payrollbtn:disabled{opacity:.55;cursor:default;}
   .acts{display:flex;gap:10px;margin-top:12px;}
   .acts button{flex:1;padding:12px;border-radius:9px;font-size:14.5px;font-weight:600;cursor:pointer;border:1.5px solid transparent;}
   .acts .approve{background:var(--green);color:#fff;}
@@ -175,7 +178,8 @@ function renderApprovals(){
   document.getElementById('head').innerHTML=
     `<div class="sh">Hi ${esc(firstName(userName))} — timesheets to approve</div>`+
     (userEmail?`<div class="meta">Signed in as ${esc(userEmail)}</div>`:'')+
-    (SITES.length?`<div class="meta">Your sites: ${esc(SITES.join(' · '))}</div>`:'');
+    (SITES.length?`<div class="meta">Your sites: ${esc(SITES.join(' · '))}</div>`:'')+
+    (SITES.length?`<button class="payrollbtn" onclick="sendPayroll()">📧 Email last week’s payroll report</button>`:'');
 
   const wrap=document.getElementById('cards');
 
@@ -213,6 +217,25 @@ function cardHtml(g){
   </div>`;
 }
 
+async function sendPayroll(){
+  if(!confirm('Email last week’s APPROVED hours to payroll for your site(s)? The supervisor is cc’d.')) return;
+  const btn=document.querySelector('.payrollbtn'); if(btn){ btn.disabled=true; btn.textContent='Sending…'; }
+  try{
+    const res=await api('/.netlify/functions/report',{ which:'last' });
+    if(res.status===401){ toast('Please sign in again'); return; }
+    const data=await res.json();
+    if(!data.ok) throw new Error(data.error||'failed');
+    const sent=(data.results||[]).filter(r=>r.sent);
+    const none=(data.results||[]).filter(r=>!r.sent);
+    if(sent.length){
+      toast('Sent to payroll: '+sent.map(r=>`${r.site} (${r.total}h)`).join(', ')+(none.length?' · nothing approved for '+none.map(r=>r.site).join(', '):''));
+    } else {
+      toast('No approved hours found for last week.');
+    }
+  }catch(e){ toast('Couldn’t send — '+((e&&e.message)||'try again')); }
+  finally{ if(btn){ btn.disabled=false; btn.textContent='📧 Email last week’s payroll report'; } }
+}
+
 async function decide(key, action){
   const g=GROUPS.find(x=>x.key===key);
   if(!g) return;
@@ -238,7 +261,7 @@ async function decide(key, action){
 function cssId(key){ return String(key).replace(/"/g,'&quot;'); }
 
 /* Version badge (shown on every screen) + always-check-for-updates on load */
-const APP_VERSION='2.0';
+const APP_VERSION='2.1';
 document.getElementById('verbadge').textContent='v'+APP_VERSION;
 document.getElementById('signinVer').textContent='Version '+APP_VERSION;
 

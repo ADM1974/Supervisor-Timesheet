@@ -6,6 +6,11 @@
   directory = "netlify/functions"
   node_bundler = "esbuild"
 
+# Daily payroll send (~early afternoon NZ). The function itself only acts on sites
+# whose pay week closed the day before, so running daily is correct.
+[functions."scheduled-payroll"]
+  schedule = "0 1 * * *"
+
 [[headers]]
   for = "/"
   [headers.values]

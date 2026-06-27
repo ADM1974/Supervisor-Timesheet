@@ -125,6 +125,64 @@ async function updateItem(token, id, fields) {
   if (!r.ok) throw new Error('graph update ' + r.status + ' ' + (await r.text()));
 }
 
+// ===== payroll-reporting helpers =====
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+// Sites list → { name: { name, closeDayIndex, approverEmails:[...] } }. Used to know
+// each site's pay-week close day + who to cc (its approvers' emails).
+async function getSitesDetailed(token) {
+  const id = await findListId(token, 'Sites');
+  if (!id) throw new Error('Sites list not found');
+  const r = await fetch(`${graphBase()}/lists/${id}/items?expand=fields&$top=999`, { headers: { Authorization: 'Bearer ' + token } });
+  if (!r.ok) throw new Error('graph sites ' + r.status + ' ' + (await r.text()));
+  const split = s => String(s || '').split(/[;\n]/).map(x => x.trim()).filter(Boolean);
+  const out = {};
+  for (const it of ((await r.json()).value || [])) {
+    const f = it.fields || {};
+    const name = String(f.Title || '').trim();
+    if (!name || f.Active === false) continue;
+    const emails = new Set();
+    for (const e of split(f.ManagerEmail)) emails.add(e.toLowerCase());
+    for (const n of split(f.Manager || f.ManagerName)) { const g = emailFromName(n); if (g) emails.add(g); }
+    const idx = WEEKDAYS.findIndex(d => d.toLowerCase() === String(f.CloseDay || '').trim().toLowerCase());
+    out[name] = { name, closeDayIndex: idx < 0 ? 0 : idx, approverEmails: [...emails] };
+  }
+  return out;
+}
+
+// Approved Timesheets rows for the given site names within [weekStart,weekEnd] (ISO dates).
+async function getApprovedForSites(token, siteNames, weekStart, weekEnd) {
+  const wanted = new Set((siteNames || []).map(s => String(s).trim()));
+  if (!wanted.size) return [];
+  const url = `${itemsUrl()}?expand=fields&$top=999&$filter=fields/Status eq 'Approved'`;
+  const r = await fetch(url, { headers: { Authorization: 'Bearer ' + token, Prefer: 'HonorNonIndexedQueriesWarningMayFailRandomly' } });
+  if (!r.ok) throw new Error('graph approved ' + r.status + ' ' + (await r.text()));
+  return ((await r.json()).value || []).filter(it => {
+    const f = it.fields || {};
+    if (!wanted.has(String(f.Site || '').trim())) return false;
+    const ed = String(f.EntryDate || '').slice(0, 10);
+    return ed >= weekStart && ed <= weekEnd;
+  });
+}
+
+// Today in NZ + its day-of-week (0=Sun..6=Sat).
+function nzToday() {
+  const s = new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  const [y, m, d] = s.split('-').map(Number);
+  return { y, m, d, dow: new Date(Date.UTC(y, m - 1, d)).getUTCDay() };
+}
+const _isoDay = ms => new Date(ms).toISOString().slice(0, 10);
+
+// The 7-day pay week ENDING on closeDayIndex. weeksBack: 0 = current open week,
+// 1 = the most recently completed week (what payroll pays), etc.
+function weekForClose(closeDayIndex, weeksBack) {
+  const { y, m, d, dow } = nzToday();
+  const today = Date.UTC(y, m - 1, d);
+  let end = today + ((closeDayIndex - dow + 7) % 7) * 86400000;   // this/next close day = current open week end
+  end -= (weeksBack || 0) * 7 * 86400000;
+  return { weekStart: _isoDay(end - 6 * 86400000), weekEnd: _isoDay(end) };
+}
+
 // ---- /supervisor endpoint: confirm sign-in and return the supervisor's name ----
 exports.handler = async (event) => {
   const headers = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
@@ -141,3 +199,7 @@ exports.getSubmittedForSites = getSubmittedForSites;
 exports.updateItem = updateItem;
 exports.itemsUrl = itemsUrl;
 exports.graphBase = graphBase;
+exports.getSitesDetailed = getSitesDetailed;
+exports.getApprovedForSites = getApprovedForSites;
+exports.nzToday = nzToday;
+exports.weekForClose = weekForClose;
