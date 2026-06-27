@@ -59,10 +59,14 @@
   .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom) + 28px);background:#1f2329;color:#fff;padding:11px 18px;border-radius:24px;font-size:13.5px;opacity:0;transition:opacity .25s;pointer-events:none;text-align:center;max-width:320px;z-index:30;}
   .toast.show{opacity:.96;}
   .verbadge{position:fixed;left:8px;bottom:8px;z-index:40;background:rgba(31,35,41,.5);color:#fff;font-size:10px;line-height:1;padding:4px 7px;border-radius:10px;letter-spacing:.3px;pointer-events:none;}
+  .expirybar{background:#9a6400;color:#fff;font-size:12.5px;line-height:1.45;padding:10px 14px;text-align:center;}
+  .expirybar.urgent{background:#b3261e;}
+  .expirybar a{color:#fff;text-decoration:underline;font-weight:600;white-space:nowrap;}
   .hidden{display:none !important;}
 </style>
 </head>
 <body>
+  <div id="expiryBar" class="expirybar hidden"></div>
   <div class="appbar">
     <span class="ttl">Approvals</span>
     <span class="user hidden" id="who" onclick="signOut()">Sign out</span>
@@ -228,9 +232,28 @@ async function decide(key, action){
 function cssId(key){ return String(key).replace(/"/g,'&quot;'); }
 
 /* Version badge (shown on every screen) + always-check-for-updates on load */
-const APP_VERSION='1.2';
+const APP_VERSION='1.3';
 document.getElementById('verbadge').textContent='v'+APP_VERSION;
 document.getElementById('signinVer').textContent='Version '+APP_VERSION;
+
+/* Warn (in-app) before the Microsoft client secret expires, so whoever's here
+   knows to renew it. Reads SUP_CONFIG.secretExpiry; links to the how-to page. */
+function checkSecretExpiry(){
+  const exp=(window.SUP_CONFIG||{}).secretExpiry; if(!exp) return;
+  const today=new Date(); today.setHours(0,0,0,0);
+  const days=Math.round((new Date(exp+'T00:00:00')-today)/86400000);
+  if(days>30) return;
+  const bar=document.getElementById('expiryBar'); if(!bar) return;
+  bar.classList.remove('hidden');
+  if(days<0){
+    bar.classList.add('urgent');
+    bar.innerHTML='⚠️ The system security key EXPIRED on '+exp+' — the timesheet apps can’t reach SharePoint. <a href="renew-secret.html" target="_blank" rel="noopener">How to fix it →</a>';
+  } else {
+    bar.classList.toggle('urgent', days<=7);
+    bar.innerHTML='⚠️ System security key expires '+exp+' (in '+days+' day'+(days===1?'':'s')+'). It must be renewed or the timesheet apps will stop working. <a href="renew-secret.html" target="_blank" rel="noopener">How to renew →</a>';
+  }
+}
+checkSecretExpiry();
 if('serviceWorker' in navigator && location.hostname!=='localhost' && location.hostname!=='127.0.0.1'){
   navigator.serviceWorker.register('sw.js').then(reg=>{ try{ reg.update(); }catch(e){} }).catch(()=>{});
 }

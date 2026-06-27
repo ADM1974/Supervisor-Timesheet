@@ -5,5 +5,9 @@
 // McLennan one.
 window.SUP_CONFIG = {
   clientId: "7a1c2b98-bb07-4748-adfd-6357da796d6d",
-  tenantId: "3efd78a4-4c46-434e-b653-4d0b65d18caa"
+  tenantId: "3efd78a4-4c46-434e-b653-4d0b65d18caa",
+  // Expiry date of the Microsoft "client secret" the apps use to reach SharePoint.
+  // The app shows a warning starting 30 days before this date. WHEN YOU RENEW THE
+  // SECRET, change this to the new expiry (format YYYY-MM-DD). Steps: renew-secret.html
+  secretExpiry: "2027-06-27"
 };
