@@ -64,12 +64,20 @@ async function findListId(token, name) {
   return list ? list.id : null;
 }
 
-// The sites this supervisor manages. PRIMARY: the "Manager" People Picker on the
-// Sites list — the office just selects supervisors from 365, and we resolve each
-// picked person's email from SharePoint's hidden User Information List. FALLBACK:
-// a "ManagerEmail" text column, used if a person can't be resolved or is typed in
-// directly. A site matches if EITHER route equals the supervisor's email
-// (case-insensitive). Returns the site NAMES (Title).
+// Turns a manager's name into the company email — format: first-initial.surname@ael.co
+// (e.g. "Andrew Corner" → a.corner@ael.co). Returns '' if it can't form one.
+function emailFromName(name) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+  if (parts.length < 2) return '';
+  const first = parts[0].replace(/[^a-z]/gi, '').charAt(0).toLowerCase();
+  const last = parts[parts.length - 1].replace(/[^a-z0-9-]/gi, '').toLowerCase();
+  return (first && last) ? `${first}.${last}@ael.co` : '';
+}
+
+// The sites this supervisor manages. Match the signed-in supervisor's email to each
+// site's manager: by the manager's NAME (a text "Manager"/"ManagerName" column →
+// email generated from the company format), OR an explicit "ManagerEmail" column
+// which OVERRIDES the generated one. Returns the site NAMES (Title).
 async function getSupervisorSites(token, email) {
   const want = String(email || '').trim().toLowerCase();
   if (!want) return [];
@@ -80,29 +88,12 @@ async function getSupervisorSites(token, email) {
   if (!r.ok) throw new Error('graph sites ' + r.status + ' ' + (await r.text()));
   const rows = (await r.json()).value || [];
 
-  // Best-effort: map SharePoint user LookupId -> email via the User Information
-  // List, so a person picked in the Manager column resolves to their email. If
-  // that list isn't reachable we silently fall back to the ManagerEmail column.
-  const idToEmail = {};
-  try {
-    const uilId = await findListId(token, 'User Information List');
-    if (uilId) {
-      const ur = await fetch(`${graphBase()}/lists/${uilId}/items?expand=fields($select=EMail)&$top=999`, { headers: { Authorization: 'Bearer ' + token } });
-      if (ur.ok) {
-        for (const u of ((await ur.json()).value || [])) {
-          const em = String((u.fields || {}).EMail || '').trim().toLowerCase();
-          if (em) idToEmail[String(u.id)] = em;
-        }
-      }
-    }
-  } catch (e) { /* fall back to ManagerEmail */ }
-
   return rows.filter(it => {
     const f = it.fields || {};
-    const lid = f.ManagerLookupId != null ? String(f.ManagerLookupId) : '';
-    const personEmail = lid ? (idToEmail[lid] || '') : '';          // from the People Picker
-    const textEmail = String(f.ManagerEmail || '').trim().toLowerCase(); // fallback column
-    return personEmail === want || textEmail === want;
+    const override = String(f.ManagerEmail || '').trim().toLowerCase();
+    if (override) return override === want;                         // manual override wins
+    const gen = emailFromName(f.Manager || f.ManagerName || '');    // else generate from the name
+    return !!gen && gen === want;
   })
     .map(it => String((it.fields || {}).Title || '').trim())
     .filter(Boolean)
