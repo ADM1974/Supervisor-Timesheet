@@ -100,7 +100,7 @@
   <div class="body hidden" id="appView">
     <div class="weekhead" id="head"></div>
     <div id="cards"><div class="loading">Loading approvals…</div></div>
-    <div class="foot" style="text-align:center;margin-top:16px"><a href="guide.html" target="_blank" rel="noopener" style="color:var(--brand-dark);font-weight:600;text-decoration:none;font-size:12.5px">How the timesheet system works →</a></div>
+    <div class="foot" style="text-align:center;margin-top:16px"><a href="guide.html" style="color:var(--brand-dark);font-weight:600;text-decoration:none;font-size:12.5px">How the timesheet system works →</a></div>
   </div>
 
   <div class="toast" id="toast"></div>
@@ -325,7 +325,7 @@ async function decide(key, action){
 function cssId(key){ return String(key).replace(/"/g,'&quot;'); }
 
 /* Version badge (shown on every screen) + always-check-for-updates on load */
-const APP_VERSION='3.2';
+const APP_VERSION='3.3';
 document.getElementById('verbadge').textContent='v'+APP_VERSION;
 document.getElementById('signinVer').textContent='Version '+APP_VERSION;
 
