@@ -81,6 +81,7 @@
     <span class="ttl">Approvals</span>
     <span class="user hidden" id="who" onclick="signOut()">Sign out</span>
   </div>
+  <div id="cdbar" style="display:none;background:#2b2f36;color:#fff;text-align:center;font-size:12.5px;padding:6px 10px;letter-spacing:.3px">⏱ Next payroll send in <b id="cdval" style="font-variant-numeric:tabular-nums">—</b></div>
 
   <!-- ===== SIGN IN ===== -->
   <div class="body" id="gateBody">
@@ -178,6 +179,7 @@ async function loadPending(){
     SITES=data.sites||[];
     GROUPS=data.groups||[];
     renderApprovals();
+    setCountdown(data.nextSend);
   }catch(e){ document.getElementById('cards').innerHTML='<div class="loading">Couldn’t load approvals — check signal.</div>'; }
 }
 
@@ -325,8 +327,22 @@ async function decide(key, action){
 }
 function cssId(key){ return String(key).replace(/"/g,'&quot;'); }
 
+/* ---- payroll countdown: time until the next per-site report is emailed to accounts ---- */
+let CD_TARGET=null;
+function setCountdown(target){ CD_TARGET=target?new Date(target):null; tickCountdown(); }
+function tickCountdown(){
+  const el=document.getElementById('cdval'), bar=document.getElementById('cdbar');
+  if(!bar||!el) return;
+  if(!CD_TARGET || isNaN(CD_TARGET.getTime())){ bar.style.display='none'; return; }
+  let ms=CD_TARGET.getTime()-Date.now(); if(ms<0) ms=0;
+  const d=Math.floor(ms/86400000), h=Math.floor(ms%86400000/3600000), m=Math.floor(ms%3600000/60000);
+  el.textContent=d+'d '+String(h).padStart(2,'0')+'h '+String(m).padStart(2,'0')+'m';
+  bar.style.display='';
+}
+setInterval(tickCountdown,30000);
+
 /* Version badge (shown on every screen) + always-check-for-updates on load */
-const APP_VERSION='3.5';
+const APP_VERSION='3.6';
 document.getElementById('verbadge').textContent='v'+APP_VERSION;
 document.getElementById('signinVer').textContent='Version '+APP_VERSION;
 

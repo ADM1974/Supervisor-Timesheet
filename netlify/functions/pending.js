@@ -1,7 +1,7 @@
 // Returns the timesheets waiting for THIS supervisor, grouped one card per
 // person's submitted week. Each group: name, site(s), week range, each day's
 // work-order lines + hours, the group total, and the row ids to action.
-const { getAppToken, validateSupervisorToken, getSupervisorSites, getSubmittedForSites, isSenior, ownsRow } = require('./supervisor');
+const { getAppToken, validateSupervisorToken, getSupervisorSites, getSubmittedForSites, isSenior, ownsRow, getSitesDetailed, nextPayrollSend } = require('./supervisor');
 
 // Monday-based week start (UTC ISO date) for a given EntryDate.
 function weekStartOf(dateStr) {
@@ -23,6 +23,13 @@ exports.handler = async (event) => {
     const sites = await getSupervisorSites(token, user.email);
     if (!sites.length) {
       return { statusCode: 200, headers, body: JSON.stringify({ ok: true, name: user.name, sites: [], groups: [] }) };
+    }
+
+    const detailed = await getSitesDetailed(token);
+    let nextSend = '';
+    for (const s of sites) {
+      const info = detailed[s];
+      if (info) { const t = nextPayrollSend(info.closeDayIndex); if (!nextSend || t < nextSend) nextSend = t; }
     }
 
     const rows = await getSubmittedForSites(token, sites);
@@ -65,7 +72,7 @@ exports.handler = async (event) => {
       (a.name.localeCompare(b.name)) || String(a.weekStart).localeCompare(String(b.weekStart))
     );
 
-    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, name: user.name, sites, groups: out }) };
+    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, name: user.name, sites, groups: out, nextSend }) };
   } catch (err) {
     console.error(err);
     return { statusCode: 502, headers, body: '{"ok":false,"error":"server"}' };

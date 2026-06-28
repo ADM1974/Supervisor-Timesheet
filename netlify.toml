@@ -11,6 +11,10 @@
 [functions."scheduled-payroll"]
   schedule = "0 1 * * *"
 
+# Reminder to approvers ~2 hours before each site's report goes out.
+[functions."payroll-reminder"]
+  schedule = "0 23 * * *"
+
 [[headers]]
   for = "/"
   [headers.values]

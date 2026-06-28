@@ -169,6 +169,8 @@ async function getSitesDetailed(token) {
     const emails = new Set();
     for (const e of split(f.ManagerEmail)) emails.add(e.toLowerCase());
     for (const n of split(f.Manager || f.ManagerName)) { const g = emailFromName(n); if (g) emails.add(g); }
+    for (const e of split(f.SeniorApproverEmail)) emails.add(e.toLowerCase());
+    for (const n of split(f.SeniorApprover)) { const g = emailFromName(n); if (g) emails.add(g); }
     const idx = WEEKDAYS.findIndex(d => d.toLowerCase() === String(f.CloseDay || '').trim().toLowerCase());
     out[name] = { name, closeDayIndex: idx < 0 ? 0 : idx, approverEmails: [...emails] };
   }
@@ -208,6 +210,22 @@ function weekForClose(closeDayIndex, weeksBack) {
   return { weekStart: _isoDay(end - 6 * 86400000), weekEnd: _isoDay(end) };
 }
 
+// Next moment a site's payroll report is emailed (the scheduler fires 01:00 UTC the
+// day after the site's close day). Returns an ISO timestamp for a close-day index.
+function nextPayrollSend(closeDayIdx) {
+  const wantDow = ((closeDayIdx + 1) % 7 + 7) % 7;
+  const now = new Date();
+  let cand = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 1, 0, 0));
+  if (cand.getTime() <= now.getTime()) cand = new Date(cand.getTime() + 86400000);
+  for (let i = 0; i < 8; i++) {
+    const nz = new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland', year: 'numeric', month: '2-digit', day: '2-digit' }).format(cand);
+    const [y, m, d] = nz.split('-').map(Number);
+    if (new Date(Date.UTC(y, m - 1, d)).getUTCDay() === wantDow) return cand.toISOString();
+    cand = new Date(cand.getTime() + 86400000);
+  }
+  return cand.toISOString();
+}
+
 // ---- /supervisor endpoint: confirm sign-in and return the supervisor's name ----
 exports.handler = async (event) => {
   const headers = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
@@ -231,3 +249,4 @@ exports.weekForClose = weekForClose;
 exports.isSenior = isSenior;
 exports.ownsRow = ownsRow;
 exports.emailFromName = emailFromName;
+exports.nextPayrollSend = nextPayrollSend;
