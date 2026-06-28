@@ -40,6 +40,7 @@
   .ln .wo{color:var(--ink);}
   .ln .hr{color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums;}
   .ln .tag{font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--brand-dark);background:#f3e7e7;border-radius:10px;padding:2px 8px;white-space:nowrap;align-self:center;}
+  .lncomment{font-size:11.5px;color:var(--muted);font-style:italic;padding:0 0 5px 2px;}
   .payrollbtn{margin-top:12px;width:100%;padding:11px;border:1.5px solid var(--brand);background:#fff;color:var(--brand-dark);border-radius:9px;font-size:13.5px;font-weight:600;cursor:pointer;}
   .payrollbtn:active{background:#f5efef;}
   .payrollbtn:disabled{opacity:.55;cursor:default;}
@@ -204,7 +205,7 @@ function cardHtml(g){
   const days=(g.days||[]).map(d=>{
     const lines=(d.lines||[]).slice().sort((a,b)=>(a.allow?1:0)-(b.allow?1:0)).map(l=> l.allow
       ? `<div class="ln"><span class="wo">${esc(l.allow)}</span><span class="tag">allowance</span></div>`
-      : `<div class="ln"><span class="wo">${esc(l.wo||'—')}</span><span class="hr">${fmtHr(l.hr)}</span></div>`).join('');
+      : `<div class="ln"><span class="wo">${esc(l.wo||'—')}</span><span class="hr">${fmtHr(l.hr)}</span></div>${l.comment?`<div class="lncomment">${esc(l.comment)}</div>`:''}`).join('');
     return `<div class="dayrow"><div class="dn">${dayLabel(d.date)}</div>${lines}</div>`;
   }).join('');
   return `<div class="card" id="card-${esc(g.key)}">
@@ -325,7 +326,7 @@ async function decide(key, action){
 function cssId(key){ return String(key).replace(/"/g,'&quot;'); }
 
 /* Version badge (shown on every screen) + always-check-for-updates on load */
-const APP_VERSION='3.4';
+const APP_VERSION='3.5';
 document.getElementById('verbadge').textContent='v'+APP_VERSION;
 document.getElementById('signinVer').textContent='Version '+APP_VERSION;
 

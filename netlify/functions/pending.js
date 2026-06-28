@@ -50,7 +50,7 @@ exports.handler = async (event) => {
       const allow = (String(f.RowType || '').toLowerCase() === 'allowance' || f.Allowance)
         ? (String(f.Allowance || '').trim() || 'Allowance')
         : '';
-      g.byDate[date].push({ wo: String(f.WorkOrder || ''), hr, allow });
+      g.byDate[date].push({ wo: String(f.WorkOrder || ''), hr, allow, comment: String(f.Comment || '') });
     }
 
     const out = Object.values(groups).map(g => ({
