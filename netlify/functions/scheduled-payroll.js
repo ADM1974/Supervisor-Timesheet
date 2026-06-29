@@ -5,14 +5,15 @@
 //
 // Late approvals after this runs are covered by the manual "send now" button in
 // the app, which re-sends the same week.
-const { getAppToken, getSitesDetailed, nzToday, weekForClose } = require('./supervisor');
+const { getAppToken, getSitesDetailed, nzNow, weekForClose } = require('./supervisor');
 const { buildAndSendForSite } = require('./report');
 
 exports.handler = async () => {
   try {
     const token = await getAppToken();
+    const { dow, hour } = nzNow();
+    if (hour !== 11) { console.log('scheduled-payroll: not 11am NZ (hour ' + hour + '), skipping'); return { statusCode: 200, body: 'skipped' }; }
     const detailed = await getSitesDetailed(token);
-    const { dow } = nzToday();
     const out = [];
     for (const site of Object.keys(detailed)) {
       const info = detailed[site];

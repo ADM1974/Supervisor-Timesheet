@@ -1,16 +1,7 @@
 // Scheduled (daily 23:00 UTC ≈ 2 hours before the 01:00 UTC payroll send). For each
 // site whose report goes out in ~2 hours (its pay week just closed), email ALL its
 // approvers a reminder to finish approvals. Schedule is in netlify.toml.
-const { getAppToken, getSitesDetailed } = require('./supervisor');
-
-// The NZ day-of-week as it will be at SEND time (01:00 UTC ≈ now + 2h), so this
-// matches exactly which sites scheduled-payroll will send.
-function sendTimeNzDow() {
-  const at = new Date(Date.now() + 2 * 3600 * 1000);
-  const nz = new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland', year: 'numeric', month: '2-digit', day: '2-digit' }).format(at);
-  const [y, m, d] = nz.split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
-}
+const { getAppToken, getSitesDetailed, nzNow } = require('./supervisor');
 
 async function emailReminder(token, toEmails, site) {
   const sender = String(process.env.SENDER_EMAIL || '').trim();
@@ -30,8 +21,9 @@ async function emailReminder(token, toEmails, site) {
 exports.handler = async () => {
   try {
     const token = await getAppToken();
+    const { dow, hour } = nzNow();
+    if (hour !== 9) { console.log('payroll-reminder: not 9am NZ (hour ' + hour + '), skipping'); return { statusCode: 200, body: 'skipped' }; }
     const detailed = await getSitesDetailed(token);
-    const dow = sendTimeNzDow();
     const out = [];
     for (const site of Object.keys(detailed)) {
       const info = detailed[site];

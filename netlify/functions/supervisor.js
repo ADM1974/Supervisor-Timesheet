@@ -210,20 +210,28 @@ function weekForClose(closeDayIndex, weeksBack) {
   return { weekStart: _isoDay(end - 6 * 86400000), weekEnd: _isoDay(end) };
 }
 
-// Next moment a site's payroll report is emailed (the scheduler fires 01:00 UTC the
-// day after the site's close day). Returns an ISO timestamp for a close-day index.
+// Current NZ time → { dow (0=Sun), hour (0-23) }. DST-correct.
+function nzNow() {
+  const dtf = new Intl.DateTimeFormat('en-GB', { timeZone: 'Pacific/Auckland', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hour12: false });
+  const p = {}; for (const x of dtf.formatToParts(new Date())) p[x.type] = x.value;
+  let hour = +p.hour; if (hour === 24) hour = 0;
+  return { dow: new Date(Date.UTC(+p.year, +p.month - 1, +p.day)).getUTCDay(), hour };
+}
+
+// Next moment a site's payroll report is emailed: 11:00 NZ on the day after the
+// site's close day. Steps UTC hours and checks NZ local time, so it's DST-correct.
 function nextPayrollSend(closeDayIdx) {
   const wantDow = ((closeDayIdx + 1) % 7 + 7) % 7;
-  const now = new Date();
-  let cand = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 1, 0, 0));
-  if (cand.getTime() <= now.getTime()) cand = new Date(cand.getTime() + 86400000);
-  for (let i = 0; i < 8; i++) {
-    const nz = new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Auckland', year: 'numeric', month: '2-digit', day: '2-digit' }).format(cand);
-    const [y, m, d] = nz.split('-').map(Number);
-    if (new Date(Date.UTC(y, m - 1, d)).getUTCDay() === wantDow) return cand.toISOString();
-    cand = new Date(cand.getTime() + 86400000);
+  let t = new Date(); t.setUTCMinutes(0, 0, 0); t = new Date(t.getTime() + 3600000);
+  for (let i = 0; i < 24 * 14; i++) {
+    const dtf = new Intl.DateTimeFormat('en-GB', { timeZone: 'Pacific/Auckland', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hour12: false });
+    const p = {}; for (const x of dtf.formatToParts(t)) p[x.type] = x.value;
+    let hh = +p.hour; if (hh === 24) hh = 0;
+    const dw = new Date(Date.UTC(+p.year, +p.month - 1, +p.day)).getUTCDay();
+    if (hh === 11 && dw === wantDow) return t.toISOString();
+    t = new Date(t.getTime() + 3600000);
   }
-  return cand.toISOString();
+  return t.toISOString();
 }
 
 // ---- /supervisor endpoint: confirm sign-in and return the supervisor's name ----
@@ -250,3 +258,4 @@ exports.isSenior = isSenior;
 exports.ownsRow = ownsRow;
 exports.emailFromName = emailFromName;
 exports.nextPayrollSend = nextPayrollSend;
+exports.nzNow = nzNow;
