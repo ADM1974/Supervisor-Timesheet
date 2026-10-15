@@ -10,6 +10,12 @@ so the pay run isn't held up: edit each line's hours / work order / comment,
 remove a line, add a note, then **Save & approve** sets the whole week to
 `Approved` in one step. Backed by `netlify/functions/amend.js`.
 
+**Manage contractors & codes** lets any supervisor add a contractor and have the
+app auto-generate a unique **access code** for the green app (issue a fresh code,
+deactivate/reactivate too) — no hand-editing the Contractors list. Backed by
+`netlify/functions/contractors.js` (writes `Title` + `Code` + `Active`). Staff and
+supervisor sign-ins use Microsoft 365, so those passwords are **not** managed here.
+
 ```
 Supervisor phone → "Sign in with Microsoft" (MSAL) → ID token
    → Netlify Function verifies the token (signature, tenant, audience)

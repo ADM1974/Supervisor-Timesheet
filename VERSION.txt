@@ -1,4 +1,15 @@
-Timesheet Approvals (Supervisor app) — VERSION 3.9  (2026-10-15)
+Timesheet Approvals (Supervisor app) — VERSION 4.0  (2026-10-15)
+
+v4.0: supervisors can SET UP CONTRACTORS from the app ("Manage contractors &
+codes"). Add a contractor by name and the app auto-generates a unique access
+code (unambiguous alphabet, no 0/O/1/I/L) for the green contractor app; you can
+also issue a fresh code, deactivate/reactivate, and tap a code to copy it. No one
+has to edit the Contractors SharePoint list by hand anymore. Any signed-in
+supervisor can manage contractors; the token is still verified server-side.
+  - New function: netlify/functions/contractors.js (list/add/regen/setactive/
+    rename), writing the Contractors list via the shared app-only Graph creds.
+    Writes Title + Code + Active (default true, so new contractors can log in).
+  - Staff/supervisor passwords are Microsoft 365 and are NOT managed here.
 
 v3.9: supervisors can AMEND a submitted week instead of rejecting it, so a wrong
 timesheet no longer holds up the pay run. On an approval card, tap Amend to edit
