@@ -21,6 +21,7 @@ exports.handler = async (event) => {
   const ids = (Array.isArray(data.ids) ? data.ids : []).map(x => String(x)).filter(Boolean);
   const edits = (data.edits && typeof data.edits === 'object') ? data.edits : {};
   const removed = new Set((Array.isArray(data.removedIds) ? data.removedIds : []).map(x => String(x)));
+  const supNote = String(data.note || '').trim().slice(0, 500);
   if (!ids.length) return bad('no ids');
 
   try {
@@ -47,7 +48,8 @@ exports.handler = async (event) => {
       const e = edits[id] || {};
       const changed = (e.hr != null) || (e.wo != null) || (e.comment != null);
       const prev = String(f.Notes || '').trim();
-      const stamp = (changed ? 'Amended & approved' : 'Approved') + ' by ' + who + ' on ' + when;
+      const stamp = (changed ? 'Amended & approved' : 'Approved') + ' by ' + who + ' on ' + when
+        + (supNote ? ' — ' + supNote : '');
       const notes = prev ? (prev + ' · ' + stamp) : stamp;
 
       const full = { Status: 'Approved', ApprovedBy: who, ApprovedDate: nowIso, Notes: notes };

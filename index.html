@@ -64,6 +64,9 @@
   .ln .amhr{width:64px;border:1px solid var(--line);border-radius:6px;padding:7px 8px;font-size:13px;text-align:right;font-family:inherit;}
   .amdel{border:none;background:none;color:var(--red);font-size:16px;cursor:pointer;padding:0 3px;line-height:1;}
   .amcomment{width:100%;box-sizing:border-box;margin-top:5px;border:1px solid var(--line);border-radius:6px;padding:7px 8px;font-size:12.5px;font-family:inherit;}
+.amnote{margin:10px 0 2px;}
+.amnote label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;}
+.amnote textarea{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:6px;padding:8px;font-size:13px;font-family:inherit;resize:vertical;}
   .empty{text-align:center;color:var(--muted);font-size:15px;padding:46px 16px;}
   .empty .big{font-size:40px;margin-bottom:8px;}
   .loading{text-align:center;color:var(--muted);font-size:14px;padding:30px 0;}
@@ -265,6 +268,10 @@ function amendCardHtml(g){
       <div class="sub">${esc(g.site||'')}${g.weekStart?' · '+esc(weekRange(g.weekStart)):''}</div></div></div>
     <div class="meta" style="margin:2px 0 8px">Change the hours or work order, or tap ✕ to remove a line, then Save &amp; approve.</div>
     ${days}
+    <div class="amnote">
+      <label>Your note (optional)</label>
+      <textarea class="amsupnote" rows="2" placeholder="e.g. Adjusted Tuesday to 8h per site log"></textarea>
+    </div>
     <div class="acts">
       <button class="approve" onclick="saveAmend('${esc(g.key)}')">Save &amp; approve</button>
       <button class="reject" onclick="cancelAmend()">Cancel</button>
@@ -285,10 +292,11 @@ async function saveAmend(key){
     const wo=row.querySelector('.amwo'), hr=row.querySelector('.amhr'), cmt=row.querySelector('.amcomment');
     edits[id]={ hr: hr?hr.value:'', wo: wo?wo.value:'', comment: cmt?cmt.value:'' };
   });
+  const noteEl=card.querySelector('.amsupnote'); const note=noteEl?noteEl.value.trim():'';
   if(!confirm('Save your changes and approve '+g.name+'’s timesheet?')) return;
   const btns=card.querySelectorAll('.acts button'); btns.forEach(b=>b.disabled=true);
   try{
-    const res=await api('/.netlify/functions/amend',{ ids:g.ids, edits, removedIds });
+    const res=await api('/.netlify/functions/amend',{ ids:g.ids, edits, removedIds, note });
     if(res.status===401){ toast('Please sign in again'); btns.forEach(b=>b.disabled=false); return; }
     const data=await res.json();
     if(!data.ok) throw new Error(data.error||'save');
@@ -415,7 +423,7 @@ function tickCountdown(){
 setInterval(tickCountdown,30000);
 
 /* Version badge (shown on every screen) + always-check-for-updates on load */
-const APP_VERSION='3.8';
+const APP_VERSION='3.9';
 document.getElementById('verbadge').textContent='v'+APP_VERSION;
 document.getElementById('signinVer').textContent='Version '+APP_VERSION;
 
