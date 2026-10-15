@@ -54,6 +54,16 @@
   .acts .approve{background:var(--green);color:#fff;}
   .acts .reject{background:#fff;color:var(--red);border-color:var(--red);}
   .acts button:disabled{opacity:.55;cursor:default;}
+  .acts .amendbtn{background:#fff;color:var(--brand-dark);border-color:var(--brand-dark);}
+  .card.amending{border:2px solid var(--brand);}
+  .amendrow{border-top:1px solid var(--line);padding:6px 0;}
+  .amendrow .ln{align-items:center;gap:8px;}
+  .amendrow.removed{opacity:.5;}
+  .amendrow.removed input{text-decoration:line-through;}
+  .ln .amwo{flex:1;min-width:0;border:1px solid var(--line);border-radius:6px;padding:7px 8px;font-size:13px;font-family:inherit;}
+  .ln .amhr{width:64px;border:1px solid var(--line);border-radius:6px;padding:7px 8px;font-size:13px;text-align:right;font-family:inherit;}
+  .amdel{border:none;background:none;color:var(--red);font-size:16px;cursor:pointer;padding:0 3px;line-height:1;}
+  .amcomment{width:100%;box-sizing:border-box;margin-top:5px;border:1px solid var(--line);border-radius:6px;padding:7px 8px;font-size:12.5px;font-family:inherit;}
   .empty{text-align:center;color:var(--muted);font-size:15px;padding:46px 16px;}
   .empty .big{font-size:40px;margin-bottom:8px;}
   .loading{text-align:center;color:var(--muted);font-size:14px;padding:30px 0;}
@@ -203,7 +213,10 @@ function renderApprovals(){
   wrap.innerHTML=GROUPS.map(cardHtml).join('');
 }
 
+let AMEND_KEY=null;
+
 function cardHtml(g){
+  if(g.key===AMEND_KEY) return amendCardHtml(g);
   const days=(g.days||[]).map(d=>{
     const lines=(d.lines||[]).slice().sort((a,b)=>(a.allow?1:0)-(b.allow?1:0)).map(l=> l.allow
       ? `<div class="ln"><span class="wo">${esc(l.allow)}</span><span class="tag">allowance</span></div>`
@@ -221,9 +234,69 @@ function cardHtml(g){
     ${days}
     <div class="acts">
       <button class="approve" onclick="decide('${esc(g.key)}','approve')">Approve</button>
+      <button class="amendbtn" onclick="startAmend('${esc(g.key)}')">Amend</button>
       <button class="reject" onclick="decide('${esc(g.key)}','reject')">Reject</button>
     </div>
   </div>`;
+}
+
+// Edit mode: fix the hours / work order / comment, or ✕ a line, then save & approve.
+function amendCardHtml(g){
+  const days=(g.days||[]).map(d=>{
+    const lines=(d.lines||[]).slice().sort((a,b)=>(a.allow?1:0)-(b.allow?1:0)).map(l=>{
+      if(l.allow){
+        return `<div class="amendrow" data-id="${esc(String(l.id||''))}" data-allow="1">
+          <div class="ln"><span class="wo">${esc(l.allow)}</span><span class="tag">allowance</span>
+          <button class="amdel" onclick="toggleRemove(this)" title="Remove">✕</button></div></div>`;
+      }
+      return `<div class="amendrow" data-id="${esc(String(l.id||''))}">
+        <div class="ln">
+          <input class="amwo" value="${esc(l.wo||'')}" placeholder="Work order">
+          <input class="amhr" type="number" step="0.25" min="0" max="24" inputmode="decimal" value="${esc(l.hr!=null?l.hr:'')}">
+          <button class="amdel" onclick="toggleRemove(this)" title="Remove line">✕</button>
+        </div>
+        <input class="amcomment" value="${esc(l.comment||'')}" placeholder="Comment (optional)">
+      </div>`;
+    }).join('');
+    return `<div class="dayrow"><div class="dn">${dayLabel(d.date)}</div>${lines}</div>`;
+  }).join('');
+  return `<div class="card amending" id="card-${esc(g.key)}">
+    <div class="hd"><div><div class="who">${esc(g.name)} — amending</div>
+      <div class="sub">${esc(g.site||'')}${g.weekStart?' · '+esc(weekRange(g.weekStart)):''}</div></div></div>
+    <div class="meta" style="margin:2px 0 8px">Change the hours or work order, or tap ✕ to remove a line, then Save &amp; approve.</div>
+    ${days}
+    <div class="acts">
+      <button class="approve" onclick="saveAmend('${esc(g.key)}')">Save &amp; approve</button>
+      <button class="reject" onclick="cancelAmend()">Cancel</button>
+    </div>
+  </div>`;
+}
+function startAmend(key){ AMEND_KEY=key; renderApprovals(); const c=document.getElementById('card-'+cssId(key)); if(c) c.scrollIntoView({block:'center'}); }
+function cancelAmend(){ AMEND_KEY=null; renderApprovals(); }
+function toggleRemove(btn){ const row=btn.closest('.amendrow'); if(row) row.classList.toggle('removed'); }
+async function saveAmend(key){
+  const g=GROUPS.find(x=>x.key===key); if(!g) return;
+  const card=document.getElementById('card-'+cssId(key)); if(!card) return;
+  const edits={}; const removedIds=[];
+  card.querySelectorAll('.amendrow').forEach(row=>{
+    const id=row.getAttribute('data-id'); if(!id) return;
+    if(row.classList.contains('removed')){ removedIds.push(id); return; }
+    if(row.getAttribute('data-allow')) return;             // allowance line kept as-is
+    const wo=row.querySelector('.amwo'), hr=row.querySelector('.amhr'), cmt=row.querySelector('.amcomment');
+    edits[id]={ hr: hr?hr.value:'', wo: wo?wo.value:'', comment: cmt?cmt.value:'' };
+  });
+  if(!confirm('Save your changes and approve '+g.name+'’s timesheet?')) return;
+  const btns=card.querySelectorAll('.acts button'); btns.forEach(b=>b.disabled=true);
+  try{
+    const res=await api('/.netlify/functions/amend',{ ids:g.ids, edits, removedIds });
+    if(res.status===401){ toast('Please sign in again'); btns.forEach(b=>b.disabled=false); return; }
+    const data=await res.json();
+    if(!data.ok) throw new Error(data.error||'save');
+    AMEND_KEY=null;
+    GROUPS=GROUPS.filter(x=>x.key!==key);
+    renderApprovals();
+    toast('Amended & approved '+g.name+(data.removed?(' · '+data.removed+' line'+(data.removed===1?'':'s')+' removed'):''));
+  }catch(e){ toast('Couldn’t save — '+((e&&e.message)||'try again')); btns.forEach(b=>b.disabled=false); }
 }
 
 /* ---------- manage work orders (per the supervisor's sites) ---------- */
@@ -342,7 +415,7 @@ function tickCountdown(){
 setInterval(tickCountdown,30000);
 
 /* Version badge (shown on every screen) + always-check-for-updates on load */
-const APP_VERSION='3.7';
+const APP_VERSION='3.8';
 document.getElementById('verbadge').textContent='v'+APP_VERSION;
 document.getElementById('signinVer').textContent='Version '+APP_VERSION;
 

@@ -150,6 +150,11 @@ async function updateItem(token, id, fields) {
   if (!r.ok) throw new Error('graph update ' + r.status + ' ' + (await r.text()));
 }
 
+async function deleteItem(token, id) {
+  const r = await fetch(`${itemsUrl()}/${id}`, { method: 'DELETE', headers: { Authorization: 'Bearer ' + token } });
+  if (!r.ok && r.status !== 204) throw new Error('graph delete ' + r.status + ' ' + (await r.text()));
+}
+
 // ===== payroll-reporting helpers =====
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -248,6 +253,7 @@ exports.findListId = findListId;
 exports.getSupervisorSites = getSupervisorSites;
 exports.getSubmittedForSites = getSubmittedForSites;
 exports.updateItem = updateItem;
+exports.deleteItem = deleteItem;
 exports.itemsUrl = itemsUrl;
 exports.graphBase = graphBase;
 exports.getSitesDetailed = getSitesDetailed;
