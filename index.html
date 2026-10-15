@@ -67,6 +67,19 @@
 .amnote{margin:10px 0 2px;}
 .amnote label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;}
 .amnote textarea{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:6px;padding:8px;font-size:13px;font-family:inherit;resize:vertical;}
+.caddrow{display:flex;gap:8px;align-items:center;margin-top:8px;}
+.crow{display:flex;justify-content:space-between;align-items:center;gap:10px;border-top:1px solid var(--line);padding:9px 0;flex-wrap:wrap;}
+.crow.off{opacity:.55;}
+.cmain{min-width:0;}
+.cname{font-weight:600;font-size:14px;}
+.cinactive{font-weight:600;font-size:11px;color:var(--muted);}
+.ccode{margin-top:2px;}
+.ccode .code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:15px;letter-spacing:1.5px;font-weight:700;color:var(--brand-dark);background:#f5efef;border-radius:6px;padding:2px 8px;cursor:pointer;}
+.cbtns{display:flex;gap:6px;flex-wrap:wrap;}
+.cbtn{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:7px;padding:6px 10px;font-size:12.5px;font-family:inherit;cursor:pointer;}
+.cbtn.add{border-color:var(--brand);color:var(--brand-dark);font-weight:600;white-space:nowrap;}
+.cbtn:active{background:#f5efef;}
+.cbtn:disabled{opacity:.55;cursor:default;}
   .empty{text-align:center;color:var(--muted);font-size:15px;padding:46px 16px;}
   .empty .big{font-size:40px;margin-bottom:8px;}
   .loading{text-align:center;color:var(--muted);font-size:14px;padding:30px 0;}
@@ -201,7 +214,7 @@ function renderApprovals(){
     `<div class="sh">Hi ${esc(firstName(userName))} — timesheets to approve</div>`+
     (userEmail?`<div class="meta">Signed in as ${esc(userEmail)}</div>`:'')+
     (SITES.length?`<div class="meta">Your sites: ${esc(SITES.join(' · '))} &nbsp;·&nbsp; <a href="#" onclick="event.preventDefault();loadPending()" style="color:var(--brand-dark);font-weight:700;text-decoration:none">↻ Refresh</a></div>`:'')+
-    (SITES.length?`<button class="payrollbtn" onclick="sendPayroll('last')">📧 Email last week’s payroll report</button><div style="text-align:center;margin-top:7px"><a href="#" onclick="event.preventDefault();sendPayroll('current')" style="font-size:12px;color:var(--brand-dark)">…or send this week so far (for testing)</a></div><div style="text-align:center;margin-top:10px"><a href="#" onclick="event.preventDefault();loadWorkOrders()" style="font-size:12.5px;color:var(--brand-dark);font-weight:600">🛠 Manage work orders</a></div>`:'');
+    (SITES.length?`<button class="payrollbtn" onclick="sendPayroll('last')">📧 Email last week’s payroll report</button><div style="text-align:center;margin-top:7px"><a href="#" onclick="event.preventDefault();sendPayroll('current')" style="font-size:12px;color:var(--brand-dark)">…or send this week so far (for testing)</a></div><div style="text-align:center;margin-top:10px"><a href="#" onclick="event.preventDefault();loadWorkOrders()" style="font-size:12.5px;color:var(--brand-dark);font-weight:600">🛠 Manage work orders</a></div><div style="text-align:center;margin-top:8px"><a href="#" onclick="event.preventDefault();loadContractors()" style="font-size:12.5px;color:var(--brand-dark);font-weight:600">👷 Manage contractors &amp; codes</a></div>`:'');
 
   const wrap=document.getElementById('cards');
 
@@ -363,6 +376,83 @@ async function removeWO(id){
   }catch(e){ toast('Couldn’t remove — '+((e&&e.message)||'try again')); }
 }
 
+/* ---------- manage contractors + their access codes ---------- */
+let CONTRACTORS=[];
+async function loadContractors(){
+  document.getElementById('head').innerHTML=`<div class="sh">Contractors</div><div class="meta">Add a contractor and give them their access code for the green app. Codes are created automatically.</div>`;
+  document.getElementById('cards').innerHTML='<div class="loading">Loading…</div>';
+  try{
+    const res=await api('/.netlify/functions/contractors',{ action:'list' });
+    if(res.status===401){ toast('Please sign in again'); return; }
+    const data=await res.json();
+    if(!data.ok) throw new Error(data.error||'load');
+    CONTRACTORS=data.contractors||[]; renderContractors();
+  }catch(e){ document.getElementById('cards').innerHTML='<div class="empty"><div class="big">⚠️</div>Couldn’t load contractors — '+esc((e&&e.message)||'try again')+'</div>'; }
+}
+function renderContractors(){
+  const rows=(CONTRACTORS||[]).map(c=>`
+    <div class="crow${c.active?'':' off'}">
+      <div class="cmain">
+        <div class="cname">${esc(c.name||'—')}${c.active?'':' <span class="cinactive">inactive</span>'}</div>
+        <div class="ccode"><span class="code" onclick="copyCode('${esc(c.code)}')" title="Tap to copy">${esc(c.code||'—')}</span></div>
+      </div>
+      <div class="cbtns">
+        <button class="cbtn" onclick="regenCode('${esc(String(c.id))}','${esc(c.name)}')" title="New code">↻ New code</button>
+        <button class="cbtn" onclick="setContractorActive('${esc(String(c.id))}',${c.active?'false':'true'})">${c.active?'Deactivate':'Reactivate'}</button>
+      </div>
+    </div>`).join('') || '<div class="meta" style="padding:6px 0">No contractors yet — add the first one below.</div>';
+  let html=`<div class="card">
+    <div class="who">Add a contractor</div>
+    <div class="caddrow">
+      <input id="cNewName" class="amwo" placeholder="Full name" style="flex:1">
+      <button class="cbtn add" id="cAddBtn" onclick="addContractor()">＋ Add</button>
+    </div>
+    <div class="meta" style="margin-top:4px">A unique access code is generated automatically.</div>
+  </div>
+  <div class="card"><div class="who">Contractors</div>${rows}</div>`;
+  html+=`<button class="payrollbtn" style="margin-top:8px;border-color:var(--line);color:var(--muted)" onclick="loadPending()">← Back to approvals</button>`;
+  document.getElementById('cards').innerHTML=html;
+}
+async function addContractor(){
+  const el=document.getElementById('cNewName'); const name=(el?el.value:'').trim();
+  if(!name){ toast('Type the contractor’s name first.'); return; }
+  const btn=document.getElementById('cAddBtn'); if(btn){ btn.disabled=true; btn.textContent='Adding…'; }
+  try{
+    const res=await api('/.netlify/functions/contractors',{ action:'add', name });
+    const data=await res.json();
+    if(!data.ok) throw new Error(data.error||'add');
+    toast('Added '+data.name+' · code '+data.code);
+    alert(data.name+'’s access code is:\n\n'+data.code+'\n\nGive this to them for the green timesheet app. You can see it again on this screen.');
+    loadContractors();
+  }catch(e){ toast('Couldn’t add — '+((e&&e.message)||'try again')); if(btn){ btn.disabled=false; btn.textContent='＋ Add'; } }
+}
+async function regenCode(id,name){
+  if(!confirm('Issue a NEW access code for '+(name||'this contractor')+'? Their old code stops working straight away.')) return;
+  try{
+    const res=await api('/.netlify/functions/contractors',{ action:'regen', id });
+    const data=await res.json();
+    if(!data.ok) throw new Error(data.error||'regen');
+    toast('New code: '+data.code);
+    alert((name||'The contractor')+'’s new access code is:\n\n'+data.code+'\n\nGive them this — the old one no longer works.');
+    loadContractors();
+  }catch(e){ toast('Couldn’t change code — '+((e&&e.message)||'try again')); }
+}
+async function setContractorActive(id,active){
+  const on=(active===true||active==='true');
+  if(!on && !confirm('Deactivate this contractor? Their code stops working until you reactivate them.')) return;
+  try{
+    const res=await api('/.netlify/functions/contractors',{ action:'setactive', id, active:on });
+    const data=await res.json();
+    if(!data.ok) throw new Error(data.error||'update');
+    toast(on?'Reactivated':'Deactivated'); loadContractors();
+  }catch(e){ toast('Couldn’t update — '+((e&&e.message)||'try again')); }
+}
+function copyCode(code){
+  if(!code) return;
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(code).then(()=>toast('Code '+code+' copied')).catch(()=>toast(code)); }
+  else toast(code);
+}
+
 async function sendPayroll(which){
   which = which==='current' ? 'current' : 'last';
   const label = which==='current' ? 'THIS week so far' : 'last week';
@@ -423,7 +513,7 @@ function tickCountdown(){
 setInterval(tickCountdown,30000);
 
 /* Version badge (shown on every screen) + always-check-for-updates on load */
-const APP_VERSION='3.9';
+const APP_VERSION='4.0';
 document.getElementById('verbadge').textContent='v'+APP_VERSION;
 document.getElementById('signinVer').textContent='Version '+APP_VERSION;
 
