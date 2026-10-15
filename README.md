@@ -1,15 +1,21 @@
 # Timesheet Approvals — Supervisor app (Microsoft 365 sign-in)
 
 The supervisor's app: sign in with a work 365 account, see the **submitted**
-timesheets for the sites you supervise, and **Approve** or **Reject** them. It
-reads and updates the **same Timesheets list** as the contractor + staff apps.
+timesheets for the sites you supervise, and **Approve**, **Amend** or **Reject**
+them. It reads and updates the **same Timesheets list** as the contractor +
+staff apps.
+
+**Amend** lets a supervisor fix a wrong week themselves instead of rejecting it,
+so the pay run isn't held up: edit each line's hours / work order / comment,
+remove a line, add a note, then **Save & approve** sets the whole week to
+`Approved` in one step. Backed by `netlify/functions/amend.js`.
 
 ```
 Supervisor phone → "Sign in with Microsoft" (MSAL) → ID token
    → Netlify Function verifies the token (signature, tenant, audience)
    → works out the supervisor's sites (Sites.ManagerEmail = their email)
    → lists Submitted rows for those sites, grouped per person/week
-   → Approve/Reject updates the rows (app-only Graph connection)
+   → Approve / Amend / Reject updates the rows (app-only Graph connection)
 ```
 
 ## How a supervisor is matched to their sites
@@ -62,6 +68,9 @@ Redeploy after setting them.
 - Open the site → **Sign in with Microsoft** → you should see that timesheet as a
   card → **Approve** → confirm the Timesheets row flips to `Approved` with an
   `ApprovedDate`. Reject asks for a reason and sets `RejectionReason`.
+- **Amend** → tap Amend on a card, change a line's hours, remove a line, add a
+  note, then **Save & approve** → confirm the row is `Approved` with the edited
+  hours and an "Amended & approved by …" entry in `Notes`.
 
 ## Notes
 - **Identity is verified server-side** and approvals are re-checked against the

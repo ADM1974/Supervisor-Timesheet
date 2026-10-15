@@ -1,4 +1,16 @@
-Timesheet Approvals (Supervisor app) — VERSION 1.1  (2026-06-27)
+Timesheet Approvals (Supervisor app) — VERSION 3.9  (2026-10-15)
+
+v3.9: supervisors can AMEND a submitted week instead of rejecting it, so a wrong
+timesheet no longer holds up the pay run. On an approval card, tap Amend to edit
+each line's hours / work order / comment, remove a line with the cross, and add
+your own note explaining the change. "Save & approve" applies the edits, deletes
+any removed lines and sets the whole week to Approved in one step. Everything is
+stamped on each row's Notes ("Amended & approved by <you> on <date> — <note>").
+  - New function: netlify/functions/amend.js (same security re-check as decide:
+    every row must still be Submitted, on one of your sites, and not your own).
+  - supervisor.js gained a deleteItem helper; pending.js now returns each line's
+    row id so the UI can target individual edits.
+  - No new SharePoint column needed — reuses Hours / WorkOrder / Comment / Notes.
 
 v1.1: supervisor-to-sites matching now reads the "Manager" People Picker on the
 Sites list (resolves the picked person's email from 365 via the User Information
@@ -15,6 +27,7 @@ How it decides what a supervisor sees:
   - Shows every Submitted Timesheets row for those sites, grouped one card per
     person's week (name, site, days, work orders, hours, total).
   - Approve  -> Status=Approved, ApprovedDate=now, approver email appended to Notes.
+  - Amend    -> edit the lines, then Status=Approved in one step (see v3.9 above).
   - Reject   -> Status=Rejected, RejectionReason=the typed reason.
   - Server re-checks every row is Submitted AND on one of the supervisor's sites,
     so nobody can approve outside their sites.
