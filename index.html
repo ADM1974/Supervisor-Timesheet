@@ -165,7 +165,7 @@ function fmtHr(n){const v=Math.round((Number(n)||0)*100)/100;return (Number.isIn
     await msalInstance.initialize();
     const resp=await msalInstance.handleRedirectPromise();
     account=(resp && resp.account) || msalInstance.getAllAccounts()[0] || null;
-    if(account){ msalInstance.setActiveAccount(account); afterSignIn(); }
+    if(account){ msalInstance.setActiveAccount(account); if(resp){ try{ sessionStorage.removeItem('reauthAt'); }catch(_){} } afterSignIn(); }
   }catch(e){ document.getElementById('signErr').textContent='Sign-in error — try again.'; }
 })();
 
@@ -176,13 +176,38 @@ async function signIn(){
 }
 function signOut(){ if(msalInstance && account){ msalInstance.logoutRedirect({ account }); } }
 
-async function getToken(){
-  const res=await msalInstance.acquireTokenSilent({ account, scopes:SCOPES });
-  return res.idToken;
+/* Staying signed in. The server checks our Microsoft ID token, which lasts ~1 hour. MSAL
+   hands back its cached copy without checking it, so refresh it ourselves before it runs out.
+   If Microsoft needs the person to sign in again (refresh token expired, ~24h), send them
+   straight back through sign-in (account pre-filled) instead of showing a "signal" error. */
+function isNetworkErr(e){ return !navigator.onLine || /request_failed|network|endpoints_resolution|timed_out|timeout/i.test(String((e&&(e.errorCode||e.message))||'')); }
+function reauth(){
+  let last=0; try{ last=+sessionStorage.getItem('reauthAt')||0; }catch(_){}
+  if(Date.now()-last<60000){ toast('Please sign out and sign in again'); return; }   // don't loop
+  try{ sessionStorage.setItem('reauthAt',String(Date.now())); }catch(_){}
+  toast('Signing you in again…');
+  msalInstance.loginRedirect({ scopes:SCOPES, loginHint:(account&&account.username)||undefined }).catch(()=>{});
+}
+class ReauthNeeded extends Error { constructor(){ super('Signing you in again…'); } }
+async function getToken(force){
+  try{
+    let res=await msalInstance.acquireTokenSilent({ account, scopes:SCOPES, forceRefresh:!!force });
+    const exp=((res.idTokenClaims||{}).exp||0)*1000;
+    if(!force && exp && exp-Date.now()<5*60000) res=await msalInstance.acquireTokenSilent({ account, scopes:SCOPES, forceRefresh:true });
+    return res.idToken;
+  }catch(e){
+    if(isNetworkErr(e)) throw e;          // genuinely offline → caller shows "check signal"
+    reauth(); throw new ReauthNeeded();
+  }
 }
 async function api(path, body){
-  const token=await getToken();
-  return fetch(path,{ method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+token}, body: body?JSON.stringify(body):'{}' });
+  const send=token=>fetch(path,{ method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+token}, body: body?JSON.stringify(body):'{}' });
+  let res=await send(await getToken(false));
+  if(res.status===401){                    // token rejected → one retry with a brand-new token
+    res=await send(await getToken(true));
+    if(res.status===401){ reauth(); throw new ReauthNeeded(); }
+  }
+  return res;
 }
 
 function afterSignIn(){
@@ -513,7 +538,7 @@ function tickCountdown(){
 setInterval(tickCountdown,30000);
 
 /* Version badge (shown on every screen) + always-check-for-updates on load */
-const APP_VERSION='4.0';
+const APP_VERSION='4.1';
 document.getElementById('verbadge').textContent='v'+APP_VERSION;
 document.getElementById('signinVer').textContent='Version '+APP_VERSION;
 

@@ -40,6 +40,7 @@ async function validateSupervisorToken(authHeader) {
   try {
     const { payload } = await jwtVerify(m[1], _jwks, {
       issuer: `https://login.microsoftonline.com/${tenant}/v2.0`,
+      clockTolerance: 120,                                  // seconds of clock skew allowed on exp/nbf
       audience: process.env.SUP_CLIENT_ID,
     });
     const id = String(payload.oid || payload.sub || '').trim();
