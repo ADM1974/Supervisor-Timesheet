@@ -143,12 +143,22 @@ async function getSubmittedForSites(token, siteNames) {
 }
 
 async function updateItem(token, id, fields) {
-  const r = await fetch(`${itemsUrl()}/${id}/fields`, {
-    method: 'PATCH',
-    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-    body: JSON.stringify(fields),
-  });
-  if (!r.ok) throw new Error('graph update ' + r.status + ' ' + (await r.text()));
+  // SharePoint throttles bursts (429) and has the odd 5xx — retry those with backoff.
+  for (let i = 0; ; i++) {
+    let r = null;
+    try {
+      r = await fetch(`${itemsUrl()}/${id}/fields`, {
+        method: 'PATCH',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify(fields),
+      });
+    } catch (e) { if (i >= 3) throw e; }
+    if (r && r.ok) return;
+    if (r && !(r.status === 429 || r.status >= 500)) throw new Error('graph update ' + r.status + ' ' + (await r.text()));
+    if (i >= 3) throw new Error('graph update ' + (r ? r.status : 'network'));
+    const ra = r ? Number(r.headers.get('retry-after')) : 0;
+    await new Promise(res => setTimeout(res, ra > 0 ? Math.min(ra, 10) * 1000 : 400 * 2 ** i));
+  }
 }
 
 async function deleteItem(token, id) {

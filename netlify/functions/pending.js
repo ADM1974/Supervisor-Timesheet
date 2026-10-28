@@ -45,7 +45,7 @@ exports.handler = async (event) => {
       const wk = weekStartOf(date) || (String(f.BatchID || '').trim() || date);
       const key = person + '|' + wk;
       if (!groups[key]) {
-        groups[key] = { key, name: String(f.Title || '').trim() || 'Worker', siteSet: new Set(), weekStart: weekStartOf(date), ids: [], total: 0, byDate: {} };
+        groups[key] = { key, name: String(f.Title || '').trim() || 'Worker', siteSet: new Set(), weekStart: weekStartOf(date), ids: [], total: 0, byDate: {}, shiftByDate: {} };
       }
       const g = groups[key];
       g.ids.push(it.id);
@@ -57,7 +57,10 @@ exports.handler = async (event) => {
       const allow = (String(f.RowType || '').toLowerCase() === 'allowance' || f.Allowance)
         ? (String(f.Allowance || '').trim() || 'Allowance')
         : '';
-      g.byDate[date].push({ id: it.id, wo: String(f.WorkOrder || ''), hr, allow, comment: String(f.Comment || '') });
+      g.byDate[date].push({ id: it.id, wo: String(f.WorkOrder || ''), hr, allow, comment: String(f.Comment || ''), co: !allow && (f.Callout === true || /^(yes|true|1)$/i.test(String(f.Callout || ''))) });
+      const sh = (g.shiftByDate[date] = g.shiftByDate[date] || { worked: '', rostered: '' });   // staff app: same on every row of the day
+      if (!sh.worked && f.ShiftWorked) sh.worked = String(f.ShiftWorked).trim();
+      if (!sh.rostered && f.RosteredShift) sh.rostered = String(f.RosteredShift).trim();
     }
 
     const out = Object.values(groups).map(g => ({
@@ -67,7 +70,7 @@ exports.handler = async (event) => {
       weekStart: g.weekStart || '',
       total: Math.round(g.total * 100) / 100,
       ids: g.ids,
-      days: Object.keys(g.byDate).sort().map(date => ({ date, lines: g.byDate[date] })),
+      days: Object.keys(g.byDate).sort().map(date => ({ date, lines: g.byDate[date], shiftWorked: (g.shiftByDate[date] || {}).worked || '', rosteredShift: (g.shiftByDate[date] || {}).rostered || '' })),
     })).sort((a, b) =>
       (a.name.localeCompare(b.name)) || String(a.weekStart).localeCompare(String(b.weekStart))
     );

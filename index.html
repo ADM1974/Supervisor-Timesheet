@@ -41,6 +41,9 @@
   .ln .hr{color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums;}
   .ln .tag{font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--brand-dark);background:#f3e7e7;border-radius:10px;padding:2px 8px;white-space:nowrap;align-self:center;}
   .lncomment{font-size:11.5px;color:var(--muted);font-style:italic;padding:0 0 5px 2px;}
+  .cotag{font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:#8a4b00;background:#fdf0dc;border-radius:10px;padding:1px 7px;margin-left:6px;white-space:nowrap;}
+  .dn .shf{font-weight:500;color:var(--muted);}
+  .shdiff{font-size:11.5px;color:#8a4b00;padding:0 0 4px;}
   .payrollbtn{margin-top:12px;width:100%;padding:11px;border:1.5px solid var(--brand);background:#fff;color:var(--brand-dark);border-radius:9px;font-size:13.5px;font-weight:600;cursor:pointer;}
   .payrollbtn:active{background:#f5efef;}
   .payrollbtn:disabled{opacity:.55;cursor:default;}
@@ -261,8 +264,8 @@ function cardHtml(g){
   const days=(g.days||[]).map(d=>{
     const lines=(d.lines||[]).slice().sort((a,b)=>(a.allow?1:0)-(b.allow?1:0)).map(l=> l.allow
       ? `<div class="ln"><span class="wo">${esc(l.allow)}</span><span class="tag">allowance</span></div>`
-      : `<div class="ln"><span class="wo">${esc(l.wo||'—')}</span><span class="hr">${fmtHr(l.hr)}</span></div>${l.comment?`<div class="lncomment">${esc(l.comment)}</div>`:''}`).join('');
-    return `<div class="dayrow"><div class="dn">${dayLabel(d.date)}</div>${lines}</div>`;
+      : `<div class="ln"><span class="wo">${esc(l.wo||'—')}${l.co?'<span class="cotag">call-out</span>':''}</span><span class="hr">${fmtHr(l.hr)}</span></div>${l.comment?`<div class="lncomment">${esc(l.comment)}</div>`:''}`).join('');
+    return `<div class="dayrow">${dayHead(d)}${lines}</div>`;
   }).join('');
   return `<div class="card" id="card-${esc(g.key)}">
     <div class="hd">
@@ -281,6 +284,15 @@ function cardHtml(g){
   </div>`;
 }
 
+// Day heading + the shift they say they worked (staff app). If it differs from the
+// Teams roster for that day (fixed at the start of the week), say what was rostered.
+function dayHead(d){
+  const w=String(d.shiftWorked||'').trim(), r=String(d.rosteredShift||'').trim();
+  const differs=r ? !(w && (r.toLowerCase()===w.toLowerCase() || r.toLowerCase().startsWith(w.toLowerCase()+' '))) : false;
+  return `<div class="dn">${dayLabel(d.date)}${w?` <span class="shf">· ${esc(w)} shift</span>`:''}</div>`
+    +(differs?`<div class="shdiff">⚠ Rostered: ${esc(r)}${w?'':' — no shift entered'}</div>`:'');
+}
+
 // Edit mode: fix the hours / work order / comment, or ✕ a line, then save & approve.
 function amendCardHtml(g){
   const days=(g.days||[]).map(d=>{
@@ -297,9 +309,10 @@ function amendCardHtml(g){
           <button class="amdel" onclick="toggleRemove(this)" title="Remove line">✕</button>
         </div>
         <input class="amcomment" value="${esc(l.comment||'')}" placeholder="Comment (optional)">
+        ${l.co?'<div class="lncomment"><span class="cotag" style="margin-left:0">call-out</span></div>':''}
       </div>`;
     }).join('');
-    return `<div class="dayrow"><div class="dn">${dayLabel(d.date)}</div>${lines}</div>`;
+    return `<div class="dayrow">${dayHead(d)}${lines}</div>`;
   }).join('');
   return `<div class="card amending" id="card-${esc(g.key)}">
     <div class="hd"><div><div class="who">${esc(g.name)} — amending</div>
@@ -538,7 +551,7 @@ function tickCountdown(){
 setInterval(tickCountdown,30000);
 
 /* Version badge (shown on every screen) + always-check-for-updates on load */
-const APP_VERSION='4.1';
+const APP_VERSION='4.2';
 document.getElementById('verbadge').textContent='v'+APP_VERSION;
 document.getElementById('signinVer').textContent='Version '+APP_VERSION;
 

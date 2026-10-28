@@ -58,7 +58,12 @@ exports.handler = async (event) => {
       if (e.comment != null) full.Comment = String(e.comment).trim().slice(0, 500);
 
       try {
-        await updateItem(token, id, full);
+        try { await updateItem(token, id, full); }
+        catch (err) {
+          // A Comment too long for a single-line column (255): keep the first 255 rather than lose it.
+          if (!(full.Comment && full.Comment.length > 255 && /^graph update 400\b/.test(String(err.message)))) throw err;
+          await updateItem(token, id, { ...full, Comment: full.Comment.slice(0, 255) });
+        }
       } catch (err) {
         // Optional columns (ApprovedBy/ApprovedDate/Comment) may not exist — retry
         // keeping the essential changes (hours/work order) + status + a note.
