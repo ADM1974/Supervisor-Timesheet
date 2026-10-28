@@ -17,12 +17,14 @@
     --amber:#b86e00;--green:#0f7b3f;--red:#b3261e;
   }
   *{box-sizing:border-box;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;}
-  html,body{margin:0;height:100%;}
-  body{background:var(--bg);color:var(--ink);display:flex;flex-direction:column;min-height:100%;position:relative;}
-  .appbar{background:var(--brand);color:#fff;padding:calc(env(safe-area-inset-top) + 16px) 16px 14px;display:flex;align-items:center;gap:10px;flex:0 0 auto;}
+  /* The page itself scrolls (an inner scroll box sized to 100% height hid its bottom behind
+     the iPhone Safari toolbar). The app bar stays pinned at the top. */
+  html,body{margin:0;}
+  body{background:var(--bg);color:var(--ink);display:flex;flex-direction:column;min-height:100vh;min-height:100dvh;position:relative;}
+  .appbar{background:var(--brand);color:#fff;padding:calc(env(safe-area-inset-top) + 16px) 16px 14px;display:flex;align-items:center;gap:10px;flex:0 0 auto;position:sticky;top:0;z-index:20;}
   .appbar .ttl{font-size:16px;font-weight:600;flex:1;}
   .appbar .user{font-size:11px;background:rgba(255,255,255,.22);padding:4px 9px;border-radius:20px;cursor:pointer;}
-  .body{flex:1;overflow-y:auto;padding:14px 14px calc(env(safe-area-inset-bottom) + 100px);max-width:560px;width:100%;margin:0 auto;-webkit-overflow-scrolling:touch;}
+  .body{flex:1 0 auto;padding:14px 14px calc(env(safe-area-inset-bottom) + 100px);max-width:560px;width:100%;margin:0 auto;}
   .body::-webkit-scrollbar{width:0;}
   .sh{font-size:11px;font-weight:700;letter-spacing:.5px;color:var(--muted);text-transform:uppercase;margin:2px 2px 4px;}
   .meta{color:var(--muted);font-size:12px;line-height:1.5;}
@@ -551,7 +553,7 @@ function tickCountdown(){
 setInterval(tickCountdown,30000);
 
 /* Version badge (shown on every screen) + always-check-for-updates on load */
-const APP_VERSION='4.2';
+const APP_VERSION='4.3';
 document.getElementById('verbadge').textContent='v'+APP_VERSION;
 document.getElementById('signinVer').textContent='Version '+APP_VERSION;
 
