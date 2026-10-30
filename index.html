@@ -86,6 +86,15 @@
 .cbtn:active{background:#f5efef;}
 .cbtn:disabled{opacity:.55;cursor:default;}
   .empty{text-align:center;color:var(--muted);font-size:15px;padding:46px 16px;}
+  .siteroll{margin-bottom:10px;}
+  .siteroll>summary{list-style:none;display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-weight:700;font-size:15px;color:var(--ink);}
+  .siteroll>summary::-webkit-details-marker{display:none;}
+  .siteroll>summary .sc{font-weight:500;font-size:12.5px;color:var(--muted);white-space:nowrap;}
+  .siteroll>summary .sn::before{content:'▸';display:inline-block;width:16px;color:var(--muted);transition:transform .15s;}
+  .siteroll[open]>summary .sn::before{transform:rotate(90deg);}
+  .siteroll[open]>summary{margin-bottom:10px;border-color:var(--brand);}
+  .siteroll.none>summary{cursor:default;opacity:.7;}
+  .siteroll.none>summary .sn::before{content:'✓';}
   .empty .big{font-size:40px;margin-bottom:8px;}
   .loading{text-align:center;color:var(--muted);font-size:14px;padding:30px 0;}
   .signin{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:26px 18px 22px;box-shadow:0 1px 2px rgba(16,24,40,.04);text-align:center;margin-top:30px;}
@@ -256,7 +265,25 @@ function renderApprovals(){
     wrap.innerHTML=`<div class="empty"><div class="big">✅</div>All caught up — no timesheets waiting.</div>`;
     return;
   }
-  wrap.innerHTML=GROUPS.map(cardHtml).join('');
+  // One site: plain list. Several: a roll-up per site (tap to open), showing how many
+  // timesheets are waiting and their hours. Open/closed is remembered on this device.
+  const bySite={};
+  for(const g of GROUPS){ const k=g.site||'No site'; (bySite[k]=bySite[k]||[]).push(g); }
+  const keys=[...new Set([...SITES,...Object.keys(bySite)])].sort((a,b)=>a.localeCompare(b));
+  if(keys.length<2){ wrap.innerHTML=GROUPS.map(cardHtml).join(''); return; }
+  wrap.innerHTML=keys.map(k=>{
+    const gs=bySite[k]||[];
+    if(!gs.length) return `<details class="siteroll none" onclick="event.preventDefault()"><summary><span class="sn">${esc(k)}</span><span class="sc">nothing waiting</span></summary></details>`;
+    const hrs=gs.reduce((s,g)=>s+(Number(g.total)||0),0);
+    const open=OPEN_SITES.has(k) || gs.some(g=>g.key===AMEND_KEY);
+    return `<details class="siteroll" data-site="${esc(k)}" ${open?'open':''} ontoggle="siteToggle(this)"><summary><span class="sn">${esc(k)}</span><span class="sc">${gs.length} waiting · ${fmtHr(hrs)}</span></summary>${gs.map(cardHtml).join('')}</details>`;
+  }).join('');
+}
+let OPEN_SITES=new Set((()=>{ try{ return JSON.parse(localStorage.getItem('openSites')||'[]'); }catch(_){ return []; } })());
+function siteToggle(el){
+  const k=el.dataset.site; if(!k) return;
+  if(el.open) OPEN_SITES.add(k); else OPEN_SITES.delete(k);
+  try{ localStorage.setItem('openSites',JSON.stringify([...OPEN_SITES])); }catch(_){}
 }
 
 let AMEND_KEY=null;
@@ -553,7 +580,7 @@ function tickCountdown(){
 setInterval(tickCountdown,30000);
 
 /* Version badge (shown on every screen) + always-check-for-updates on load */
-const APP_VERSION='4.3';
+const APP_VERSION='4.4';
 document.getElementById('verbadge').textContent='v'+APP_VERSION;
 document.getElementById('signinVer').textContent='Version '+APP_VERSION;
 
