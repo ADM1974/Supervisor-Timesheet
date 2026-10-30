@@ -43,6 +43,8 @@
   .ln .hr{color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums;}
   .ln .tag{font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--brand-dark);background:#f3e7e7;border-radius:10px;padding:2px 8px;white-space:nowrap;align-self:center;}
   .lncomment{font-size:11.5px;color:var(--muted);font-style:italic;padding:0 0 5px 2px;}
+  .daysub{display:flex;justify-content:space-between;font-size:12.5px;font-weight:700;color:#3b424b;border-top:1px dashed var(--line);margin-top:4px;padding-top:4px;}
+  .daysub .hr{font-variant-numeric:tabular-nums;white-space:nowrap;}
   .cotag{font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:#8a4b00;background:#fdf0dc;border-radius:10px;padding:1px 7px;margin-left:6px;white-space:nowrap;}
   .dn .shf{font-weight:500;color:var(--muted);}
   .shdiff{font-size:11.5px;color:#8a4b00;padding:0 0 4px;}
@@ -294,7 +296,8 @@ function cardHtml(g){
     const lines=(d.lines||[]).slice().sort((a,b)=>(a.allow?1:0)-(b.allow?1:0)).map(l=> l.allow
       ? `<div class="ln"><span class="wo">${esc(l.allow)}</span><span class="tag">allowance</span></div>`
       : `<div class="ln"><span class="wo">${esc(l.wo||'—')}${l.co?'<span class="cotag">call-out</span>':''}</span><span class="hr">${fmtHr(l.hr)}</span></div>${l.comment?`<div class="lncomment">${esc(l.comment)}</div>`:''}`).join('');
-    return `<div class="dayrow">${dayHead(d)}${lines}</div>`;
+    const sub=(d.lines||[]).filter(l=>!l.allow).reduce((s,l)=>s+(Number(l.hr)||0),0);   // the day's hours (allowances carry none)
+    return `<div class="dayrow">${dayHead(d)}${lines}<div class="daysub"><span>Day total</span><span class="hr">${fmtHr(sub)}</span></div></div>`;
   }).join('');
   return `<div class="card" id="card-${esc(g.key)}">
     <div class="hd">
@@ -580,7 +583,7 @@ function tickCountdown(){
 setInterval(tickCountdown,30000);
 
 /* Version badge (shown on every screen) + always-check-for-updates on load */
-const APP_VERSION='4.4';
+const APP_VERSION='4.5';
 document.getElementById('verbadge').textContent='v'+APP_VERSION;
 document.getElementById('signinVer').textContent='Version '+APP_VERSION;
 
