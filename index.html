@@ -321,7 +321,7 @@ function cardHtml(g){
     </div>
   </div>`;
 }
-// Per-job allowances on a work-order line (e.g. Call-out, Call-out – on site).
+// Per-job allowances on a work-order line (e.g. Call-out, Call-Out - Working Hours).
 function jobTags(l){ return (l.jobs||[]).map(j=>`<span class="cotag">${esc(j)}</span>`).join(''); }
 // Week over the worker's contract hours (Workers.ContractHours): needs the senior approver as well.
 function contractNote(g){

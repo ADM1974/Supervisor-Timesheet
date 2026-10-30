@@ -269,7 +269,7 @@ function personWeekKey(f) {
   return person + '|' + (weekStartOf(date) || String(f.BatchID || '').trim() || date);
 }
 
-// A line's per-job allowances (staff app column JobAllowances, e.g. "Call-out, Call-out – on site").
+// A line's per-job allowances (staff app column JobAllowances, e.g. "Call-out, Call-Out - Working Hours").
 // Rows saved before that column existed have Callout = Yes instead.
 function jobAllowancesOf(f) {
   const jobs = String(f.JobAllowances || '').split(/[;,]/).map(x => x.trim()).filter(Boolean);

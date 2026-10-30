@@ -10,7 +10,7 @@ const { getAppToken, validateSupervisorToken, getSupervisorSites, getSitesDetail
 const ExcelJS = require('exceljs');
 const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
 
-// { 'Call-out': 2, 'Call-out – on site': 1 } → "2 × Call-out, 1 × Call-out – on site" ('' if none).
+// { 'Call-out': 2, 'Call-Out - Working Hours': 1 } → "2 × Call-out, 1 × Call-Out - Working Hours" ('' if none).
 const jobSummary = counts => Object.entries(counts || {}).sort((a, b) => a[0].localeCompare(b[0])).map(([j, n]) => `${n} × ${j}`).join(', ');
 
 // ---- shape the approved rows into per-worker totals ----
