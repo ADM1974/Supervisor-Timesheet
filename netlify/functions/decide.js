@@ -4,7 +4,11 @@
 // Security: we re-check server-side that EVERY id is currently a Submitted row
 // whose Site is one the supervisor manages — so a supervisor can't approve rows
 // outside their sites even if they post arbitrary ids.
-const { getAppToken, validateSupervisorToken, getSupervisorSites, getSubmittedForSites, updateItem, isSenior, ownsRow } = require('./supervisor');
+//
+// Over contract: a week with more hours than the worker's contract (Workers.ContractHours)
+// needs the site's senior approver too. A supervisor's Approve then only marks it
+// "awaiting senior approval" (still Submitted); the senior approver's Approve approves it.
+const { getAppToken, validateSupervisorToken, getSupervisorSites, getSubmittedForSites, updateItem, ownsRow, overContract } = require('./supervisor');
 
 exports.handler = async (event) => {
   const headers = { 'Content-Type': 'application/json' };
@@ -38,11 +42,23 @@ exports.handler = async (event) => {
     const nowIso = new Date().toISOString();
     const when = nowIso.slice(0, 16).replace('T', ' ');                       // e.g. 2026-06-27 14:32
     const who = user.name ? (user.name + ' <' + user.email + '>') : user.email;
+
+    const oc = action === 'approve' ? await overContract(token, user, rows, targets) : null;
+    if (oc && oc.overBy > 0 && !oc.senior) {
+      if (oc.held) return bad('This week is over contract and is waiting for the senior approver.');
+      const stamp = `Supervisor OK by ${who} on ${when} — ${oc.overBy} h over the ${oc.contract} h contract, awaiting senior approval`;
+      for (const id of targets) {
+        const prev = String((allowed.get(id).fields || {}).Notes || '').trim();
+        await updateItem(token, id, { Notes: prev ? (prev + ' · ' + stamp) : stamp });
+      }
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, updated: 0, held: targets.length, overBy: oc.overBy }) };
+    }
+    const overNote = oc && oc.overBy > 0 ? ` (incl. ${oc.overBy} h over the ${oc.contract} h contract)` : '';
     let updated = 0;
     for (const id of targets) {
       const prev = String((allowed.get(id).fields || {}).Notes || '').trim();
       const verb = action === 'approve' ? 'Approved' : 'Rejected';
-      const stamp = verb + ' by ' + who + ' on ' + when + (action === 'reject' ? ' — ' + reason : '');
+      const stamp = verb + ' by ' + who + ' on ' + when + overNote + (action === 'reject' ? ' — ' + reason : '');
       const notes = prev ? (prev + ' · ' + stamp) : stamp;
       const full = {
         Status: action === 'approve' ? 'Approved' : 'Rejected',

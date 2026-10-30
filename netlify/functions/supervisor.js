@@ -187,8 +187,11 @@ async function getSitesDetailed(token) {
     for (const n of split(f.Manager || f.ManagerName)) { const g = emailFromName(n); if (g) emails.add(g); }
     for (const e of split(f.SeniorApproverEmail)) emails.add(e.toLowerCase());
     for (const n of split(f.SeniorApprover)) { const g = emailFromName(n); if (g) emails.add(g); }
+    const seniors = new Set();
+    for (const e of split(f.SeniorApproverEmail)) seniors.add(e.toLowerCase());
+    for (const n of split(f.SeniorApprover)) { const g = emailFromName(n); if (g) seniors.add(g); }
     const idx = WEEKDAYS.findIndex(d => d.toLowerCase() === String(f.CloseDay || '').trim().toLowerCase());
-    out[name] = { name, closeDayIndex: idx < 0 ? 0 : idx, approverEmails: [...emails] };
+    out[name] = { name, closeDayIndex: idx < 0 ? 0 : idx, approverEmails: [...emails], seniorEmails: [...seniors] };
   }
   return out;
 }
@@ -251,6 +254,72 @@ function nextPayrollSend(closeDayIdx) {
 }
 
 // ---- /supervisor endpoint: confirm sign-in and return the supervisor's name ----
+// Monday-based week start (UTC ISO date) for a given EntryDate.
+function weekStartOf(dateStr) {
+  const d = new Date(String(dateStr).slice(0, 10) + 'T00:00:00Z');
+  if (isNaN(d)) return '';
+  const back = (d.getUTCDay() + 6) % 7;       // days since Monday
+  d.setUTCDate(d.getUTCDate() - back);
+  return d.toISOString().slice(0, 10);
+}
+// One approval card = one person's week. ContractorId is the stable per-person key; the name if it's missing.
+function personWeekKey(f) {
+  const person = String(f.ContractorId || f.Title || '').trim() || 'unknown';
+  const date = String(f.EntryDate || '').slice(0, 10);
+  return person + '|' + (weekStartOf(date) || String(f.BatchID || '').trim() || date);
+}
+
+// A line's per-job allowances (staff app column JobAllowances, e.g. "Call-out, Call-out – on site").
+// Rows saved before that column existed have Callout = Yes instead.
+function jobAllowancesOf(f) {
+  const jobs = String(f.JobAllowances || '').split(/[;,]/).map(x => x.trim()).filter(Boolean);
+  if (!jobs.length && (f.Callout === true || /^(yes|true|1)$/i.test(String(f.Callout || '')))) jobs.push('Call-out');
+  return jobs;
+}
+
+// Weekly contract hours by worker name (lower case), from the Workers list's optional
+// "ContractHours" number column. Workers without one aren't checked.
+async function getContractHours(token) {
+  const id = await findListId(token, 'Workers').catch(() => null);
+  if (!id) return {};
+  const r = await fetch(`${graphBase()}/lists/${id}/items?expand=fields&$top=999`, { headers: { Authorization: 'Bearer ' + token } });
+  if (!r.ok) return {};
+  const out = {};
+  for (const it of ((await r.json()).value || [])) {
+    const f = it.fields || {};
+    const h = parseFloat(f.ContractHours);
+    const name = String(f.Title || '').trim().toLowerCase();
+    if (name && h > 0) out[name] = h;
+  }
+  return out;
+}
+
+// Over-contract rule: a week with more hours than the worker's contract needs a second
+// OK from the site's senior approver (Sites.SeniorApprover / SeniorApproverEmail, or env
+// SENIOR_APPROVERS). The supervisor's approval leaves the rows Submitted with this
+// marker in Notes; the senior approver's approval then makes them Approved.
+const HELD_RE = /awaiting senior approval/i;
+function isSeniorFor(user, siteNames, detailed) {
+  const email = String((user && user.email) || '').trim().toLowerCase();
+  if (isSenior(email)) return true;
+  return siteNames.length > 0 && siteNames.every(s => ((detailed[s] || {}).seniorEmails || []).includes(email));
+}
+// For the week(s) the ids belong to (rows = the Submitted rows they came from):
+// { contract, total, overBy, held, senior }. hoursOf(row) overrides a row's hours (amend).
+async function overContract(token, user, rows, ids, hoursOf) {
+  const idSet = new Set(ids.map(String));
+  const keys = new Set(rows.filter(it => idSet.has(String(it.id))).map(it => personWeekKey(it.fields || {})));
+  const week = rows.filter(it => keys.has(personWeekKey(it.fields || {})));
+  const [contracts, detailed] = await Promise.all([getContractHours(token), getSitesDetailed(token)]);
+  const name = String(((week[0] || {}).fields || {}).Title || '').trim().toLowerCase();
+  const contract = contracts[name] || 0;
+  const total = week.reduce((s, it) => s + (hoursOf ? hoursOf(it) : (Number((it.fields || {}).Hours) || 0)), 0);
+  const overBy = contract ? Math.max(0, Math.round((total - contract) * 100) / 100) : 0;
+  const held = week.some(it => HELD_RE.test(String((it.fields || {}).Notes || '')));
+  const sites = [...new Set(week.map(it => String((it.fields || {}).Site || '').trim()).filter(Boolean))];
+  return { contract, total, overBy, held, senior: isSeniorFor(user, sites, detailed) };
+}
+
 exports.handler = async (event) => {
   const headers = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
   const user = await validateSupervisorToken(event.headers && (event.headers.authorization || event.headers.Authorization));
@@ -276,3 +345,10 @@ exports.ownsRow = ownsRow;
 exports.emailFromName = emailFromName;
 exports.nextPayrollSend = nextPayrollSend;
 exports.nzNow = nzNow;
+exports.weekStartOf = weekStartOf;
+exports.personWeekKey = personWeekKey;
+exports.jobAllowancesOf = jobAllowancesOf;
+exports.getContractHours = getContractHours;
+exports.isSeniorFor = isSeniorFor;
+exports.overContract = overContract;
+exports.HELD_RE = HELD_RE;

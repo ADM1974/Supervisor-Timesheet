@@ -6,7 +6,10 @@
 // Body: { ids:[...], edits:{ "<rowId>":{hr,wo,comment} }, removedIds:[...] }
 // Security: same re-check as decide.js — every id must currently be a Submitted row
 // for a site this supervisor manages, and not the supervisor's own sheet.
-const { getAppToken, validateSupervisorToken, getSupervisorSites, getSubmittedForSites, updateItem, deleteItem, ownsRow } = require('./supervisor');
+//
+// Over contract (after the changes): as decide.js — a supervisor's save keeps the week
+// Submitted, "awaiting senior approval"; the senior approver's save approves it.
+const { getAppToken, validateSupervisorToken, getSupervisorSites, getSubmittedForSites, updateItem, deleteItem, ownsRow, overContract } = require('./supervisor');
 
 exports.handler = async (event) => {
   const headers = { 'Content-Type': 'application/json' };
@@ -37,6 +40,17 @@ exports.handler = async (event) => {
     const nowIso = new Date().toISOString();
     const when = nowIso.slice(0, 16).replace('T', ' ');
     const who = user.name ? (user.name + ' <' + user.email + '>') : user.email;
+    const newHours = it => {
+      const id = String(it.id);
+      if (removed.has(id)) return 0;
+      const h = edits[id] && edits[id].hr != null ? parseFloat(edits[id].hr) : NaN;
+      return !isNaN(h) && h >= 0 && h <= 24 ? h : (Number((it.fields || {}).Hours) || 0);
+    };
+    const oc = await overContract(token, user, rows, targets, newHours);
+    const hold = oc.overBy > 0 && !oc.senior;
+    if (hold && oc.held) return bad('This week is over contract and is waiting for the senior approver.');
+    const heldNote = hold ? ` — ${oc.overBy} h over the ${oc.contract} h contract, awaiting senior approval` : '';
+    const overNote = !hold && oc.overBy > 0 ? ` (incl. ${oc.overBy} h over the ${oc.contract} h contract)` : '';
     let approved = 0, removedCount = 0;
 
     for (const id of targets) {
@@ -48,11 +62,11 @@ exports.handler = async (event) => {
       const e = edits[id] || {};
       const changed = (e.hr != null) || (e.wo != null) || (e.comment != null);
       const prev = String(f.Notes || '').trim();
-      const stamp = (changed ? 'Amended & approved' : 'Approved') + ' by ' + who + ' on ' + when
-        + (supNote ? ' — ' + supNote : '');
+      const stamp = (hold ? (changed ? 'Amended, Supervisor OK' : 'Supervisor OK') : (changed ? 'Amended & approved' : 'Approved'))
+        + ' by ' + who + ' on ' + when + overNote + heldNote + (supNote ? ' · ' + supNote : '');
       const notes = prev ? (prev + ' · ' + stamp) : stamp;
 
-      const full = { Status: 'Approved', ApprovedBy: who, ApprovedDate: nowIso, Notes: notes };
+      const full = hold ? { Notes: notes } : { Status: 'Approved', ApprovedBy: who, ApprovedDate: nowIso, Notes: notes };
       if (e.hr != null) { const h = parseFloat(e.hr); if (!isNaN(h) && h >= 0 && h <= 24) full.Hours = h; }
       if (e.wo != null) full.WorkOrder = String(e.wo).trim().slice(0, 200);
       if (e.comment != null) full.Comment = String(e.comment).trim().slice(0, 500);
@@ -67,7 +81,7 @@ exports.handler = async (event) => {
       } catch (err) {
         // Optional columns (ApprovedBy/ApprovedDate/Comment) may not exist — retry
         // keeping the essential changes (hours/work order) + status + a note.
-        const minimal = { Status: 'Approved', Notes: notes };
+        const minimal = hold ? { Notes: notes } : { Status: 'Approved', Notes: notes };
         if (full.Hours != null) minimal.Hours = full.Hours;
         if (full.WorkOrder != null) minimal.WorkOrder = full.WorkOrder;
         console.warn('amend: full update failed, retrying minimal —', err.message);
@@ -76,7 +90,7 @@ exports.handler = async (event) => {
       approved++;
     }
 
-    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, approved, removed: removedCount }) };
+    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, approved: hold ? 0 : approved, held: hold ? approved : 0, overBy: oc.overBy, removed: removedCount }) };
   } catch (err) {
     console.error(err);
     return { statusCode: 502, headers, body: JSON.stringify({ ok: false, error: 'server' }) };

@@ -6,9 +6,12 @@
 // scheduled job. Email goes out via Microsoft Graph sendMail using the app-only
 // token — needs the app to have Mail.Send (application) granted, and these env
 // vars:  SENDER_EMAIL (mailbox to send from), PAYROLL_EMAIL (recipient).
-const { getAppToken, validateSupervisorToken, getSupervisorSites, getSitesDetailed, getApprovedForSites, weekForClose } = require('./supervisor');
+const { getAppToken, validateSupervisorToken, getSupervisorSites, getSitesDetailed, getApprovedForSites, weekForClose, jobAllowancesOf } = require('./supervisor');
 const ExcelJS = require('exceljs');
 const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
+
+// { 'Call-out': 2, 'Call-out – on site': 1 } → "2 × Call-out, 1 × Call-out – on site" ('' if none).
+const jobSummary = counts => Object.entries(counts || {}).sort((a, b) => a[0].localeCompare(b[0])).map(([j, n]) => `${n} × ${j}`).join(', ');
 
 // ---- shape the approved rows into per-worker totals ----
 function buildReportData(site, weekStart, weekEnd, rows) {
@@ -16,16 +19,16 @@ function buildReportData(site, weekStart, weekEnd, rows) {
   for (const it of rows) {
     const f = it.fields || {};
     const key = String(f.ContractorId || f.Title || '').trim() || 'unknown';
-    const w = byWorker[key] || (byWorker[key] = { name: String(f.Title || '').trim() || 'Worker', days: {}, total: 0, allowances: [], callouts: 0, approvedBy: new Set() });
+    const w = byWorker[key] || (byWorker[key] = { name: String(f.Title || '').trim() || 'Worker', days: {}, total: 0, allowances: [], jobCounts: {}, approvedBy: new Set() });
     const date = String(f.EntryDate || '').slice(0, 10);
     const isAllow = String(f.RowType || '').toLowerCase() === 'allowance' || !!f.Allowance;
     if (isAllow) {
       w.allowances.push({ date, name: String(f.Allowance || 'Allowance').trim() });
     } else {
       const hr = Number(f.Hours) || 0;
-      const co = f.Callout === true || /^(yes|true|1)$/i.test(String(f.Callout || ''));   // staff app: this job was a call-out
-      if (co) w.callouts++;
-      (w.days[date] = w.days[date] || []).push({ wo: String(f.WorkOrder || '').trim(), hr, co });
+      const jobs = jobAllowancesOf(f);                     // staff app: per-job allowances, e.g. Call-out
+      for (const j of jobs) w.jobCounts[j] = (w.jobCounts[j] || 0) + 1;
+      (w.days[date] = w.days[date] || []).push({ wo: String(f.WorkOrder || '').trim(), hr, jobs });
       w.total += hr;
     }
     const ab = String(f.ApprovedBy || '').trim();
@@ -34,14 +37,15 @@ function buildReportData(site, weekStart, weekEnd, rows) {
   const workers = Object.values(byWorker).map(w => ({
     name: w.name,
     total: Math.round(w.total * 100) / 100,
-    callouts: w.callouts,
+    jobCounts: w.jobCounts,
     days: Object.keys(w.days).sort().map(date => ({ date, lines: w.days[date] })),
     allowances: w.allowances.sort((a, b) => a.date.localeCompare(b.date)),
     approvedBy: [...w.approvedBy].join(', '),
   })).sort((a, b) => a.name.localeCompare(b.name));
   const grandTotal = Math.round(workers.reduce((s, w) => s + w.total, 0) * 100) / 100;
-  const callouts = workers.reduce((s, w) => s + w.callouts, 0);
-  return { site, weekStart, weekEnd, workers, grandTotal, callouts };
+  const jobCounts = {};
+  for (const w of workers) for (const [j, n] of Object.entries(w.jobCounts)) jobCounts[j] = (jobCounts[j] || 0) + n;
+  return { site, weekStart, weekEnd, workers, grandTotal, jobCounts };
 }
 
 // ---- spreadsheet ----
@@ -51,15 +55,15 @@ async function makeXlsx(rep) {
   ws.addRow([`Payroll — ${rep.site}`]).font = { bold: true, size: 14 };
   ws.addRow([`Pay week ${rep.weekStart} to ${rep.weekEnd} — APPROVED hours`]);
   ws.addRow([]);
-  const head = ws.addRow(['Worker', 'Date', 'Work order', 'Hours', 'Call-out', 'Allowance', 'Approved by']);
+  const head = ws.addRow(['Worker', 'Date', 'Work order', 'Hours', 'Per-job allowance', 'Allowance', 'Approved by']);
   head.font = { bold: true };
   for (const w of rep.workers) {
-    for (const d of w.days) for (const l of d.lines) ws.addRow([w.name, d.date, l.wo, l.hr, l.co ? 'Yes' : '', '', w.approvedBy]);
+    for (const d of w.days) for (const l of d.lines) ws.addRow([w.name, d.date, l.wo, l.hr, l.jobs.join(', '), '', w.approvedBy]);
     for (const a of w.allowances) ws.addRow([w.name, a.date, '', '', '', a.name, w.approvedBy]);
-    ws.addRow([`${w.name} — total`, '', '', w.total, w.callouts ? `${w.callouts} call-out${w.callouts === 1 ? '' : 's'}` : '', '', '']).font = { bold: true };
+    ws.addRow([`${w.name} — total`, '', '', w.total, jobSummary(w.jobCounts), '', '']).font = { bold: true };
     ws.addRow([]);
   }
-  ws.addRow(['GRAND TOTAL', '', '', rep.grandTotal, rep.callouts ? `${rep.callouts} call-out${rep.callouts === 1 ? '' : 's'}` : '', '', '']).font = { bold: true, size: 12 };
+  ws.addRow(['GRAND TOTAL', '', '', rep.grandTotal, jobSummary(rep.jobCounts), '', '']).font = { bold: true, size: 12 };
   ws.columns.forEach((c, i) => { c.width = i === 0 ? 24 : (i === 2 ? 26 : 16); });
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
@@ -79,14 +83,14 @@ async function makePdf(rep) {
   put(`Pay week ${rep.weekStart} to ${rep.weekEnd} — approved hours`, font, 10);
   y -= 6;
   for (const w of rep.workers) {
-    put(`${w.name}    (${w.total} h${w.callouts ? `, ${w.callouts} call-out${w.callouts === 1 ? '' : 's'}` : ''})`, bold, 12);
-    for (const d of w.days) for (const l of d.lines) put(`${d.date}    ${l.wo || '-'}    ${l.hr} h${l.co ? '    [CALL-OUT]' : ''}`, font, 10, 14);
+    put(`${w.name}    (${w.total} h${jobSummary(w.jobCounts) ? ', ' + jobSummary(w.jobCounts) : ''})`, bold, 12);
+    for (const d of w.days) for (const l of d.lines) put(`${d.date}    ${l.wo || '-'}    ${l.hr} h${l.jobs.length ? '    [' + l.jobs.join(', ').toUpperCase() + ']' : ''}`, font, 10, 14);
     for (const a of w.allowances) put(`${a.date}    ${a.name}    [allowance]`, font, 10, 14);
     if (w.approvedBy) put(`approved by ${w.approvedBy}`, font, 8, 14);
     y -= 6;
   }
   y -= 6;
-  put(`GRAND TOTAL: ${rep.grandTotal} h${rep.callouts ? `  ·  ${rep.callouts} call-out${rep.callouts === 1 ? '' : 's'}` : ''}`, bold, 13);
+  put(`GRAND TOTAL: ${rep.grandTotal} h${jobSummary(rep.jobCounts) ? '  ·  ' + jobSummary(rep.jobCounts) : ''}`, bold, 13);
   return Buffer.from(await doc.save());
 }
 
@@ -99,7 +103,7 @@ async function sendReport(token, rep, xlsxBuf, pdfBuf, ccEmails) {
   const cc = [...new Set((ccEmails || []).map(e => String(e).trim().toLowerCase()).filter(Boolean).filter(e => e !== payroll.toLowerCase()))];
   const message = {
     subject: `Payroll — ${rep.site} — week ${rep.weekStart} to ${rep.weekEnd}`,
-    body: { contentType: 'HTML', content: `<p>Approved hours for <b>${rep.site}</b>, pay week ${rep.weekStart} to ${rep.weekEnd}.</p><p>${rep.workers.length} worker(s) · <b>${rep.grandTotal} h</b> total${rep.callouts ? ` · <b>${rep.callouts} call-out job${rep.callouts === 1 ? '' : 's'}</b>` : ''}. Spreadsheet and PDF attached.</p>` },
+    body: { contentType: 'HTML', content: `<p>Approved hours for <b>${rep.site}</b>, pay week ${rep.weekStart} to ${rep.weekEnd}.</p><p>${rep.workers.length} worker(s) · <b>${rep.grandTotal} h</b> total${jobSummary(rep.jobCounts) ? ` · <b>${jobSummary(rep.jobCounts)}</b>` : ''}. Spreadsheet and PDF attached.</p>` },
     toRecipients: [{ emailAddress: { address: payroll } }],
     ccRecipients: cc.map(a => ({ emailAddress: { address: a } })),
     attachments: [

@@ -47,6 +47,9 @@
   .daysub .hr{font-variant-numeric:tabular-nums;white-space:nowrap;}
   .cotag{font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:#8a4b00;background:#fdf0dc;border-radius:10px;padding:1px 7px;margin-left:6px;white-space:nowrap;}
   .dn .shf{font-weight:500;color:var(--muted);}
+  .ocnote{background:#fdf0dc;border:1px solid #f0cf98;color:#8a4b00;border-radius:8px;padding:7px 10px;font-size:12.5px;font-weight:600;margin:6px 0 8px;}
+  .ocnote.held{background:#eef3fb;border-color:#c9d8ef;color:#2b4a7a;}
+  .waitnote{flex:2;align-self:center;font-size:12.5px;color:var(--muted);}
   .shdiff{font-size:11.5px;color:#8a4b00;padding:0 0 4px;}
   .payrollbtn{margin-top:12px;width:100%;padding:11px;border:1.5px solid var(--brand);background:#fff;color:var(--brand-dark);border-radius:9px;font-size:13.5px;font-weight:600;cursor:pointer;}
   .payrollbtn:active{background:#f5efef;}
@@ -295,7 +298,7 @@ function cardHtml(g){
   const days=(g.days||[]).map(d=>{
     const lines=(d.lines||[]).slice().sort((a,b)=>(a.allow?1:0)-(b.allow?1:0)).map(l=> l.allow
       ? `<div class="ln"><span class="wo">${esc(l.allow)}</span><span class="tag">allowance</span></div>`
-      : `<div class="ln"><span class="wo">${esc(l.wo||'—')}${l.co?'<span class="cotag">call-out</span>':''}</span><span class="hr">${fmtHr(l.hr)}</span></div>${l.comment?`<div class="lncomment">${esc(l.comment)}</div>`:''}`).join('');
+      : `<div class="ln"><span class="wo">${esc(l.wo||'—')}${jobTags(l)}</span><span class="hr">${fmtHr(l.hr)}</span></div>${l.comment?`<div class="lncomment">${esc(l.comment)}</div>`:''}`).join('');
     const sub=(d.lines||[]).filter(l=>!l.allow).reduce((s,l)=>s+(Number(l.hr)||0),0);   // the day's hours (allowances carry none)
     return `<div class="dayrow">${dayHead(d)}${lines}<div class="daysub"><span>Day total</span><span class="hr">${fmtHr(sub)}</span></div></div>`;
   }).join('');
@@ -307,13 +310,25 @@ function cardHtml(g){
       </div>
       <div class="gtot">${fmtHr(g.total)}</div>
     </div>
+    ${contractNote(g)}
     ${days}
     <div class="acts">
-      <button class="approve" onclick="decide('${esc(g.key)}','approve')">Approve</button>
-      <button class="amendbtn" onclick="startAmend('${esc(g.key)}')">Amend</button>
+      ${g.held && !g.canSenior
+        ? `<span class="waitnote">Waiting for the senior approver</span>`
+        : `<button class="approve" onclick="decide('${esc(g.key)}','approve')">${g.held?'Approve extra hours':'Approve'}</button>
+      <button class="amendbtn" onclick="startAmend('${esc(g.key)}')">Amend</button>`}
       <button class="reject" onclick="decide('${esc(g.key)}','reject')">Reject</button>
     </div>
   </div>`;
+}
+// Per-job allowances on a work-order line (e.g. Call-out, Call-out – on site).
+function jobTags(l){ return (l.jobs||[]).map(j=>`<span class="cotag">${esc(j)}</span>`).join(''); }
+// Week over the worker's contract hours (Workers.ContractHours): needs the senior approver as well.
+function contractNote(g){
+  if(!(g.overBy>0)) return '';
+  const base=`${fmtHr(g.overBy)} over the ${fmtHr(g.contract)} contract`;
+  if(g.held) return `<div class="ocnote held">⏳ ${base} — OK’d by ${esc(g.heldBy||'the supervisor')}; ${g.canSenior?'needs your senior approval.':'waiting for the senior approver.'}</div>`;
+  return `<div class="ocnote">⚠ ${base} — ${g.canSenior?'you’re the senior approver, so approving also signs off the extra hours.':'once you approve, the site’s senior approver has to OK the extra hours.'}</div>`;
 }
 
 // Day heading + the shift they say they worked (staff app). If it differs from the
@@ -341,7 +356,7 @@ function amendCardHtml(g){
           <button class="amdel" onclick="toggleRemove(this)" title="Remove line">✕</button>
         </div>
         <input class="amcomment" value="${esc(l.comment||'')}" placeholder="Comment (optional)">
-        ${l.co?'<div class="lncomment"><span class="cotag" style="margin-left:0">call-out</span></div>':''}
+        ${(l.jobs||[]).length?`<div class="lncomment">${jobTags(l).replace(/class="cotag"/g,'class="cotag" style="margin-left:0;margin-right:6px"')}</div>`:''}
       </div>`;
     }).join('');
     return `<div class="dayrow">${dayHead(d)}${lines}</div>`;
@@ -349,6 +364,7 @@ function amendCardHtml(g){
   return `<div class="card amending" id="card-${esc(g.key)}">
     <div class="hd"><div><div class="who">${esc(g.name)} — amending</div>
       <div class="sub">${esc(g.site||'')}${g.weekStart?' · '+esc(weekRange(g.weekStart)):''}</div></div></div>
+    ${contractNote(g)}
     <div class="meta" style="margin:2px 0 8px">Change the hours or work order, or tap ✕ to remove a line, then Save &amp; approve.</div>
     ${days}
     <div class="amnote">
@@ -384,9 +400,11 @@ async function saveAmend(key){
     const data=await res.json();
     if(!data.ok) throw new Error(data.error||'save');
     AMEND_KEY=null;
+    const rm=data.removed?(' · '+data.removed+' line'+(data.removed===1?'':'s')+' removed'):'';
+    if(data.held){ toast(`Saved — ${g.name}’s week is ${fmtHr(data.overBy)} over contract, sent to the senior approver${rm}`); await loadPending(); return; }
     GROUPS=GROUPS.filter(x=>x.key!==key);
     renderApprovals();
-    toast('Amended & approved '+g.name+(data.removed?(' · '+data.removed+' line'+(data.removed===1?'':'s')+' removed'):''));
+    toast('Amended & approved '+g.name+rm);
   }catch(e){ toast('Couldn’t save — '+((e&&e.message)||'try again')); btns.forEach(b=>b.disabled=false); }
 }
 
@@ -559,7 +577,8 @@ async function decide(key, action){
     const res=await api('/.netlify/functions/decide',{ ids:g.ids, action, reason });
     if(res.status===401){ toast('Please sign in again'); btns.forEach(b=>b.disabled=false); return; }
     const data=await res.json();
-    if(!data.ok) throw new Error('decide');
+    if(!data.ok){ if(data.error && res.status===400){ toast(data.error); btns.forEach(b=>b.disabled=false); return; } throw new Error('decide'); }
+    if(data.held){ toast(`OK’d — ${g.name}’s week is ${fmtHr(data.overBy)} over contract, sent to the senior approver`); await loadPending(); return; }
     GROUPS=GROUPS.filter(x=>x.key!==key);
     renderApprovals();
     const by=userEmail?(' · by '+userEmail):'';
@@ -583,7 +602,7 @@ function tickCountdown(){
 setInterval(tickCountdown,30000);
 
 /* Version badge (shown on every screen) + always-check-for-updates on load */
-const APP_VERSION='4.5';
+const APP_VERSION='4.6';
 document.getElementById('verbadge').textContent='v'+APP_VERSION;
 document.getElementById('signinVer').textContent='Version '+APP_VERSION;
 
