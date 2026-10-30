@@ -40,3 +40,7 @@
   for = "/manifest.webmanifest"
   [headers.values]
     Cache-Control = "no-cache"
+
+# Leave requests: email approvers about leave waiting for them (see leave-notify.js)
+[functions."leave-notify"]
+  schedule = "*/10 * * * *"

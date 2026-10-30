@@ -50,6 +50,13 @@
   .dn .shf{font-weight:500;color:var(--muted);}
   .ocnote{background:#fdf0dc;border:1px solid #f0cf98;color:#8a4b00;border-radius:8px;padding:7px 10px;font-size:12.5px;font-weight:600;margin:6px 0 8px;}
   .ocnote.held{background:#eef3fb;border-color:#c9d8ef;color:#2b4a7a;}
+  .lvcard .lvtop{display:flex;justify-content:space-between;gap:8px;align-items:flex-start;}
+  .lvcard .nm{font-weight:700;font-size:15px;}
+  .lvcard .sub{font-size:12px;color:var(--muted);margin-top:1px;}
+  .lvcard .lvtype{font-size:11px;font-weight:700;background:#eef3fb;color:#2b4a7a;border-radius:20px;padding:3px 9px;white-space:nowrap;}
+  .lvcard .lvwhen{font-weight:600;font-size:14px;margin:9px 0 4px;}
+  .lvbusy{background:#f6f7f9;border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:12px;margin-top:8px;line-height:1.5;}
+  .lvup{padding:8px 4px;border-top:1px solid var(--line);font-size:13px;}
   .waitnote{flex:2;align-self:center;font-size:12.5px;color:var(--muted);}
   .shdiff{font-size:11.5px;color:#8a4b00;padding:0 0 4px;}
   .payrollbtn{margin-top:12px;width:100%;padding:11px;border:1.5px solid var(--brand);background:#fff;color:var(--brand-dark);border-radius:9px;font-size:13.5px;font-weight:600;cursor:pointer;}
@@ -148,6 +155,7 @@
   <!-- ===== APPROVALS ===== -->
   <div class="body hidden" id="appView">
     <div class="weekhead" id="head"></div>
+    <div id="leaveBox"></div>
     <div id="cards"><div class="loading">Loading approvals…</div></div>
     <div class="foot" style="text-align:center;margin-top:16px"><a href="guide.html" style="color:var(--brand-dark);font-weight:600;text-decoration:none;font-size:12.5px">How the timesheet system works →</a></div>
   </div>
@@ -242,6 +250,7 @@ function afterSignIn(){
 
 /* ---------- approvals ---------- */
 async function loadPending(){
+  loadLeave();
   document.getElementById('cards').innerHTML='<div class="loading">Loading approvals…</div>';
   try{
     const res=await api('/.netlify/functions/pending',{});
@@ -253,6 +262,51 @@ async function loadPending(){
     renderApprovals();
     setCountdown(data.nextSend);
   }catch(e){ document.getElementById('cards').innerHTML='<div class="loading">Couldn’t load approvals — check signal.</div>'; }
+}
+
+/* ---------- leave requests (shown only when leave is switched on — see leave-core.js) ---------- */
+let LEAVE={on:false};
+async function loadLeave(){
+  try{ const res=await api('/.netlify/functions/leave-admin',{action:'list'}); const d=await res.json(); LEAVE=d.ok?d:{on:false}; }
+  catch(_){ LEAVE={on:false}; }
+  renderLeave();
+}
+function lvRange(r){ return r.start===r.end?dayLabel(r.start):dayLabel(r.start)+' – '+dayLabel(r.end); }
+function leaveCardHtml(r){
+  return `<div class="card lvcard">
+    <div class="lvtop"><div><div class="nm">${esc(r.name)}</div><div class="sub">${esc(r.site)} · ${r.personType==='Contractor'?'Contractor':'Staff'}</div></div><span class="lvtype">${esc(r.type)}</span></div>
+    <div class="lvwhen">${esc(lvRange(r))} · ${r.days} day${r.days===1?'':'s'}${r.hours?' · '+fmtHr(r.hours):''}</div>
+    ${r.note?`<div class="meta">“${esc(r.note)}”</div>`:''}
+    ${r.evidenceUrl?`<div class="meta"><a href="${esc(r.evidenceUrl)}" target="_blank" rel="noopener">📎 View certificate</a></div>`:(r.needsAttachment?'<div class="meta">📎 No certificate yet</div>':'')}
+    ${r.held?`<div class="ocnote held">⏳ OK’d by ${esc(r.heldBy||'the supervisor')} — ${r.canAct?'needs your senior approval.':'waiting for the senior approver.'}</div>`:''}
+    ${(r.rules||[]).length?`<div class="ocnote">⚠ ${r.rules.map(esc).join('<br>⚠ ')}${r.held?'':'<br><span style="font-weight:500">The senior approver has to OK it as well.</span>'}</div>`:''}
+    ${r.entitlement?'<div class="meta">An entitlement — it can’t be refused because of rosters. Acknowledge it and arrange cover.</div>':''}
+    ${(r.busy||[]).length?`<div class="lvbusy"><b>Also off${r.siteMax?` (site limit ${r.siteMax})`:''}:</b>${r.busy.slice(0,6).map(b=>`<div>${esc(dayLabel(b.date))}: ${esc(b.people.join(', '))}</div>`).join('')}${r.busy.length>6?`<div>…and ${r.busy.length-6} more days</div>`:''}</div>`:''}
+    <div class="acts">${r.canAct?`<button class="approve" onclick="leaveDecide('${esc(r.id)}','approve',this)">${r.entitlement?'Acknowledge':(r.held?'Approve (senior)':'Approve')}</button>`:'<span class="waitnote">Waiting for the senior approver</span>'}
+      <button class="reject" onclick="leaveDecide('${esc(r.id)}','decline',this)">Decline</button></div>
+  </div>`;
+}
+function renderLeave(){
+  const box=document.getElementById('leaveBox');
+  if(!LEAVE.on){ box.innerHTML=''; return; }
+  if(LEAVE.setup){ box.innerHTML=`<div class="ocnote held">${esc(LEAVE.setup)}</div>`; return; }
+  const reqs=LEAVE.requests||[], up=LEAVE.upcoming||[];
+  box.innerHTML=`<div class="sh" style="margin-top:4px">Leave requests</div>`
+    +(reqs.length?reqs.map(leaveCardHtml).join(''):'<div class="meta" style="margin:0 2px 10px">No leave waiting.</div>')
+    +(up.length?`<details class="siteroll"><summary><span class="sn">Upcoming leave</span><span class="sc">${up.length} in the next 60 days</span></summary>${up.map(u=>`<div class="lvup"><b>${esc(u.name)}</b> · ${esc(u.site)} · ${esc(u.type)}<br><span class="meta">${esc(lvRange(u))} · ${u.days} day${u.days===1?'':'s'}</span></div>`).join('')}</details>`:'')
+    +'<div class="sh" style="margin-top:14px">Timesheets</div>';
+}
+async function leaveDecide(id,action,btn){
+  let reason='';
+  if(action==='decline'){ reason=prompt('Reason for declining (they will see this):'); if(reason===null) return; reason=reason.trim(); if(!reason){ toast('A reason is needed'); return; } }
+  const btns=btn.parentNode.querySelectorAll('button'); btns.forEach(b=>b.disabled=true);
+  try{
+    const res=await api('/.netlify/functions/leave-admin',{action,id,reason});
+    const d=await res.json();
+    if(!d.ok){ toast(d.error||'Couldn’t save — try again'); btns.forEach(b=>b.disabled=false); return; }
+    toast(d.held?'OK’d — sent to the senior approver':d.status==='Declined'?'Declined':d.shiftsError?d.status+' — but couldn’t add it to Teams Shifts':d.status+(d.shifts?' — added to Teams Shifts':''));
+    loadLeave();
+  }catch(e){ if(!(e instanceof ReauthNeeded)) toast('Couldn’t save — check signal'); btns.forEach(b=>b.disabled=false); }
 }
 
 function renderApprovals(){
@@ -604,7 +658,7 @@ function tickCountdown(){
 setInterval(tickCountdown,30000);
 
 /* Version badge (shown on every screen) + always-check-for-updates on load */
-const APP_VERSION='4.7';
+const APP_VERSION='4.8';
 document.getElementById('verbadge').textContent='v'+APP_VERSION;
 document.getElementById('signinVer').textContent='Version '+APP_VERSION;
 
