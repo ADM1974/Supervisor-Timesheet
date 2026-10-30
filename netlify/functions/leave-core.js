@@ -30,13 +30,17 @@ const FINAL_OK = ['Approved', 'Acknowledged'];
 // ---------- lists ----------
 let _lists = null, _listsAt = 0;
 async function findList(token, name) {
-  if (!_lists || Date.now() - _listsAt > 600000) {
+  const want = String(name).toLowerCase().replace(/\s+/g, '');
+  const pick = () => _lists.find(l => String(l.displayName || '').toLowerCase().replace(/\s+/g, '') === want) || null;
+  const load = async () => {
     const r = await fetch(`${spBase()}/lists?$select=id,displayName&$top=999`, { headers: auth(token) });
     if (!r.ok) throw new Error('lists ' + r.status);
     _lists = (await r.json()).value || []; _listsAt = Date.now();
-  }
-  const want = String(name).toLowerCase().replace(/\s+/g, '');
-  return _lists.find(l => String(l.displayName || '').toLowerCase().replace(/\s+/g, '') === want) || null;
+  };
+  if (!_lists || Date.now() - _listsAt > 600000) await load();
+  // A list made since the last look (e.g. while setting leave up) — look again rather than wait 10 min.
+  if (!pick() && Date.now() - _listsAt > 5000) await load();
+  return pick();
 }
 async function listItems(token, listId) {
   const out = [];
