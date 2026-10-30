@@ -270,10 +270,11 @@ function personWeekKey(f) {
 }
 
 // A line's per-job allowances (staff app column JobAllowances, e.g. "Call-out, Call-Out - Working Hours").
-// Rows saved before that column existed have Callout = Yes instead.
+// Rows saved before that column existed have Callout = Yes instead; those were all taken
+// during working hours, so they count as "Call-Out - Working Hours".
 function jobAllowancesOf(f) {
   const jobs = String(f.JobAllowances || '').split(/[;,]/).map(x => x.trim()).filter(Boolean);
-  if (!jobs.length && (f.Callout === true || /^(yes|true|1)$/i.test(String(f.Callout || '')))) jobs.push('Call-out');
+  if (!jobs.length && (f.Callout === true || /^(yes|true|1)$/i.test(String(f.Callout || '')))) jobs.push('Call-Out - Working Hours');
   return jobs;
 }
 
