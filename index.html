@@ -22,7 +22,8 @@
   html,body{margin:0;}
   body{background:var(--bg);color:var(--ink);display:flex;flex-direction:column;min-height:100vh;min-height:100dvh;position:relative;}
   .appbar{background:var(--brand);color:#fff;padding:calc(env(safe-area-inset-top) + 16px) 16px 14px;display:flex;align-items:center;gap:10px;flex:0 0 auto;position:sticky;top:0;z-index:20;}
-  .appbar .ttl{font-size:16px;font-weight:600;flex:1;}
+  .appbar .brandlogo{height:15px;width:auto;flex:0 0 auto;display:block;}
+  .appbar .ttl{font-size:14px;font-weight:600;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-left:10px;border-left:1px solid rgba(255,255,255,.4);}
   .appbar .user{font-size:11px;background:rgba(255,255,255,.22);padding:4px 9px;border-radius:20px;cursor:pointer;}
   .body{flex:1 0 auto;padding:14px 14px calc(env(safe-area-inset-bottom) + 100px);max-width:560px;width:100%;margin:0 auto;}
   .body::-webkit-scrollbar{width:0;}
@@ -103,7 +104,7 @@
   .empty .big{font-size:40px;margin-bottom:8px;}
   .loading{text-align:center;color:var(--muted);font-size:14px;padding:30px 0;}
   .signin{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:26px 18px 22px;box-shadow:0 1px 2px rgba(16,24,40,.04);text-align:center;margin-top:30px;}
-  .signin .logo{width:64px;height:64px;border-radius:16px;margin:2px auto 14px;display:block;}
+  .signin .logo{width:230px;max-width:80%;height:auto;margin:4px auto 18px;display:block;}
   .signin h2{font-size:18px;font-weight:600;margin:0 0 6px;}
   .signin .ms{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:13px;margin-top:18px;background:#fff;border:1px solid #cdd3da;border-radius:8px;font-size:15px;font-weight:600;color:#1f2329;cursor:pointer;}
   .signin .ms:hover{background:#f4f7fb;}
@@ -123,6 +124,7 @@
 <body>
   <div id="expiryBar" class="expirybar hidden"></div>
   <div class="appbar">
+    <img class="brandlogo" src="icons/ael-logo-white.svg" alt="Airport Equipment">
     <span class="ttl">Approvals</span>
     <span class="user hidden" id="who" onclick="signOut()">Sign out</span>
   </div>
@@ -131,7 +133,7 @@
   <!-- ===== SIGN IN ===== -->
   <div class="body" id="gateBody">
     <div class="signin">
-      <img class="logo" src="icons/icon-192.png" alt="">
+      <img class="logo" src="icons/ael-logo.svg" alt="Airport Equipment">
       <h2>Timesheet approvals</h2>
       <div class="meta">Sign in with your work account to review and approve the timesheets for the sites you supervise.</div>
       <button class="ms" id="msBtn" onclick="signIn()">
@@ -602,7 +604,7 @@ function tickCountdown(){
 setInterval(tickCountdown,30000);
 
 /* Version badge (shown on every screen) + always-check-for-updates on load */
-const APP_VERSION='4.6.1';
+const APP_VERSION='4.7';
 document.getElementById('verbadge').textContent='v'+APP_VERSION;
 document.getElementById('signinVer').textContent='Version '+APP_VERSION;
 
