@@ -4,7 +4,8 @@
 // SharePoint (site SP_SITE_ID):
 //   LeaveTypes     Title, Active, Site (lookup, multi; blank = every site), Entitlement,
 //                  Confidential, AllowPastDates, NeedsAttachment, SeniorApproval (yes/no),
-//                  (NeedsAttachment = a certificate may be asked for — see evidenceReason)
+//                  (NeedsAttachment = a certificate may be asked for — see evidenceReason;
+//                  optional CertificateAfterDays (number) and CertificateNextToDayOff (yes/no))
 //                  MinNoticeDays, MaxDaysBeforeSenior (number), PayrollCode (text),
 //                  Contractors (yes/no — offered to contractors)
 //   LeaveRequests  Title (person), Email, PersonType (Staff/Contractor), PersonId, Site,
@@ -121,6 +122,9 @@ async function getLeaveTypes(token) {
       allowPast: yes(f.AllowPastDates), needsAttachment: yes(f.NeedsAttachment),
       senior: yes(f.SeniorApproval), minNotice: num(f.MinNoticeDays), maxDays: num(f.MaxDaysBeforeSenior),
       code: String(f.PayrollCode || '').trim(), contractors: yes(f.Contractors),
+      // certificate rule — blank = the AEL default (more than 1 day, or next to a day off)
+      certAfter: f.CertificateAfterDays == null || f.CertificateAfterDays === '' ? 1 : num(f.CertificateAfterDays),
+      certNextTo: f.CertificateNextToDayOff == null || f.CertificateNextToDayOff === '' ? true : yes(f.CertificateNextToDayOff),
     }))
     .sort((a, b) => a.title.localeCompare(b.title));
 }
@@ -208,12 +212,15 @@ const addHistory = (r, line) => (r.history ? r.history + '\n' : '') + line;
 
 // ---------- evidence rule ----------
 // The NES (s 107) lets us ask for evidence only when there's a reason, so for types ticked
-// NeedsAttachment a certificate / stat dec is needed when the absence is more than one
-// working day, or a single day next to a weekend or public holiday (AEL Company Manual
+// NeedsAttachment a certificate / stat dec is needed when the absence is more than
+// CertificateAfterDays working days (default 1; 0 = every time), or a single day next to a
+// weekend or public holiday unless CertificateNextToDayOff = No (AEL Company Manual
 // 6.14.3). A supervisor can also ask for one. Needed → a "Certificate needed" History line.
 function evidenceReason(type, days, holidays) {
   if (!type || !type.needsAttachment || !days.length) return '';
-  if (days.length > 1) return `${days.length} working days off`;
+  const after = type.certAfter == null ? 1 : type.certAfter;
+  if (days.length > after) return after ? `more than ${after} working day${after === 1 ? '' : 's'} off` : 'needed for this leave type';
+  if (type.certNextTo === false || days.length !== 1) return '';
   const h = holidays || {};
   const off = d => { const wd = new Date(msOf(d)).getUTCDay(); return wd === 0 || wd === 6 || !!h[d]; };
   const t = msOf(days[0]);

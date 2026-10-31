@@ -33,7 +33,9 @@ Type the column names exactly as shown (no spaces) when creating them.
 | Entitlement | Yes/No | sick, carer's, compassionate, FDV… — no rules, supervisor **acknowledges** |
 | Confidential | Yes/No | shown to others only as "Leave" (e.g. Family & Domestic Violence) |
 | AllowPastDates | Yes/No | can be entered after the fact (sick) |
-| NeedsAttachment | Yes/No | a certificate / stat dec is needed when it's **more than 1 working day** or a single day **next to a weekend or public holiday** (supervisors can also ask) |
+| NeedsAttachment | Yes/No | a certificate / stat dec may be needed — when, is set by the next two columns (supervisors can also ask) |
+| CertificateAfterDays | Number (optional) | needed when off **more than** this many working days. Blank = 1; 0 = every time |
+| CertificateNextToDayOff | Yes/No (optional) | also needed for a single day next to a weekend or public holiday. Blank = Yes |
 | SeniorApproval | Yes/No | always needs the senior approver (e.g. Long Service) |
 | MinNoticeDays | Number | less notice → senior approver (e.g. Annual = 28) |
 | MaxDaysBeforeSenior | Number | longer → senior approver (e.g. Annual = 10) |
@@ -73,6 +75,31 @@ week, leaving 6 weeks). Those are supervisor-booked leave, which the app doesn't
 (blank = no limit).
 
 **Contractors** — optional **Email** column, so contractors are emailed decisions.
+
+## Changing the rules
+
+The rules above are AEL's **current** baseline (October 2026), not fixed in the code.
+They can change — most are a number or a tick in SharePoint and take effect within a
+minute, no redeploy:
+
+| Rule | Where to change it |
+|---|---|
+| Notice needed (e.g. annual 4 weeks, parental 10 weeks) | LeaveTypes **MinNoticeDays** |
+| Longest request before the senior approver (annual 10 days) | LeaveTypes **MaxDaysBeforeSenior** |
+| Types that always need the senior approver | LeaveTypes **SeniorApproval** |
+| When a certificate is needed | LeaveTypes **NeedsAttachment**, **CertificateAfterDays**, **CertificateNextToDayOff** |
+| Backdating, contractors, confidential, retiring a type | LeaveTypes **AllowPastDates**, **Contractors**, **Confidential**, **Active** |
+| How many can be off at once | Sites **MaxOnLeave** |
+| Who the senior approver is | Sites **SeniorApprover** / env SENIOR_APPROVERS |
+
+**Fixed in the code** (ask for a change): weekends and public holidays aren't counted;
+a broken rule sends the request to the senior approver rather than refusing it;
+entitlement types are acknowledged, not approved; nobody approves their own leave.
+
+**When you change a rule, also update the wording** in each app's `guide.html` (the
+"rules on asking for leave" boxes quote the current numbers) and `LeaveTypes_baseline.xlsx`.
+The legal floor doesn't move: NES parental notice is 10 weeks, sick-leave evidence can
+only be asked for with a reason, and annual leave can't be unreasonably refused.
 
 ## How approval works
 
