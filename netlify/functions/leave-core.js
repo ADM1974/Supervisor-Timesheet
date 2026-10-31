@@ -269,7 +269,7 @@ async function addTimeOff(token, teamId, userId, start, end, site) {
   const reason = await leaveReasonId(token, teamId);
   const body = { timeOffReasonId: reason, startDateTime: zonedMidnightUtc(start, tz), endDateTime: zonedMidnightUtc(isoOf(msOf(end) + 86400000), tz), theme: 'gray' };
   const r = await shiftsFetch(token, `https://graph.microsoft.com/v1.0/teams/${teamId}/schedule/timesOff`, {
-    method: 'POST', body: JSON.stringify({ userId, sharedTimeOff: body, draftTimeOff: body }),
+    method: 'POST', body: JSON.stringify({ userId, sharedTimeOff: body }),   // shared = published; Graph refuses draft + shared together
   });
   if (!r.ok) throw new Error('add time off ' + r.status + ' ' + (await r.text()).slice(0, 300));
   return (await r.json()).id;
