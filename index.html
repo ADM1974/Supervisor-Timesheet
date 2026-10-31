@@ -73,6 +73,7 @@
   .acts .reject{background:#fff;color:var(--red);border-color:var(--red);}
   .acts button:disabled{opacity:.55;cursor:default;}
   .acts .amendbtn{background:#fff;color:var(--brand-dark);border-color:var(--brand-dark);}
+  .acts .askev{background:#fff;color:var(--brand-dark);border-color:#c9d3ea;font-weight:500;}
   .card.amending{border:2px solid var(--brand);}
   .amendrow{border-top:1px solid var(--line);padding:6px 0;}
   .amendrow .ln{align-items:center;gap:8px;}
@@ -277,13 +278,13 @@ function leaveCardHtml(r){
     <div class="lvtop"><div><div class="nm">${esc(r.name)}</div><div class="sub">${esc(r.site)} · ${r.personType==='Contractor'?'Contractor':'Staff'}</div></div><span class="lvtype">${esc(r.type)}</span></div>
     <div class="lvwhen">${esc(lvRange(r))} · ${r.days} day${r.days===1?'':'s'}${r.hours?' · '+fmtHr(r.hours):''}</div>
     ${r.note?`<div class="meta">“${esc(r.note)}”</div>`:''}
-    ${r.evidenceUrl?`<div class="meta"><a href="${esc(r.evidenceUrl)}" target="_blank" rel="noopener">📎 View certificate</a></div>`:(r.needsAttachment?'<div class="meta">📎 No certificate yet</div>':'')}
+    ${r.evidenceUrl?`<div class="meta"><a href="${esc(r.evidenceUrl)}" target="_blank" rel="noopener">📎 View certificate</a></div>`:(r.needsAttachment?'<div class="meta">📎 Certificate needed — not added yet</div>':'')}
     ${r.held?`<div class="ocnote held">⏳ OK’d by ${esc(r.heldBy||'the supervisor')} — ${r.canAct?'needs your senior approval.':'waiting for the senior approver.'}</div>`:''}
     ${(r.rules||[]).length?`<div class="ocnote">⚠ ${r.rules.map(esc).join('<br>⚠ ')}${r.held?'':'<br><span style="font-weight:500">The senior approver has to OK it as well.</span>'}</div>`:''}
     ${r.entitlement?'<div class="meta">An entitlement — it can’t be refused because of rosters. Acknowledge it and arrange cover.</div>':''}
     ${(r.busy||[]).length?`<div class="lvbusy"><b>Also off${r.siteMax?` (site limit ${r.siteMax})`:''}:</b>${r.busy.slice(0,6).map(b=>`<div>${esc(dayLabel(b.date))}: ${esc(b.people.join(', '))}</div>`).join('')}${r.busy.length>6?`<div>…and ${r.busy.length-6} more days</div>`:''}</div>`:''}
     <div class="acts">${r.canAct?`<button class="approve" onclick="leaveDecide('${esc(r.id)}','approve',this)">${r.entitlement?'Acknowledge':(r.held?'Approve (senior)':'Approve')}</button>`:'<span class="waitnote">Waiting for the senior approver</span>'}
-      <button class="reject" onclick="leaveDecide('${esc(r.id)}','decline',this)">Decline</button></div>
+      <button class="reject" onclick="leaveDecide('${esc(r.id)}','decline',this)">Decline</button>${r.canAskEvidence?`<button class="askev" onclick="leaveDecide('${esc(r.id)}','askevidence',this)">Ask for certificate</button>`:''}</div>
   </div>`;
 }
 function renderLeave(){
@@ -298,13 +299,14 @@ function renderLeave(){
 }
 async function leaveDecide(id,action,btn){
   let reason='';
+  if(action==='askevidence'&&!confirm('Ask them for a medical certificate or stat dec? They’ll be emailed.')) return;
   if(action==='decline'){ reason=prompt('Reason for declining (they will see this):'); if(reason===null) return; reason=reason.trim(); if(!reason){ toast('A reason is needed'); return; } }
   const btns=btn.parentNode.querySelectorAll('button'); btns.forEach(b=>b.disabled=true);
   try{
     const res=await api('/.netlify/functions/leave-admin',{action,id,reason});
     const d=await res.json();
     if(!d.ok){ toast(d.error||'Couldn’t save — try again'); btns.forEach(b=>b.disabled=false); return; }
-    toast(d.held?'OK’d — sent to the senior approver':d.status==='Declined'?'Declined':d.shiftsError?d.status+' — but couldn’t add it to Teams Shifts':d.status+(d.shifts?' — added to Teams Shifts':''));
+    toast(d.status==='asked'?'Asked for a certificate':d.held?'OK’d — sent to the senior approver':d.status==='Declined'?'Declined':d.shiftsError?d.status+' — but couldn’t add it to Teams Shifts':d.status+(d.shifts?' — added to Teams Shifts':''));
     loadLeave();
   }catch(e){ if(!(e instanceof ReauthNeeded)) toast('Couldn’t save — check signal'); btns.forEach(b=>b.disabled=false); }
 }
@@ -658,7 +660,7 @@ function tickCountdown(){
 setInterval(tickCountdown,30000);
 
 /* Version badge (shown on every screen) + always-check-for-updates on load */
-const APP_VERSION='4.9';
+const APP_VERSION='4.10';
 document.getElementById('verbadge').textContent='v'+APP_VERSION;
 document.getElementById('signinVer').textContent='Version '+APP_VERSION;
 

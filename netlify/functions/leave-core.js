@@ -4,6 +4,7 @@
 // SharePoint (site SP_SITE_ID):
 //   LeaveTypes     Title, Active, Site (lookup, multi; blank = every site), Entitlement,
 //                  Confidential, AllowPastDates, NeedsAttachment, SeniorApproval (yes/no),
+//                  (NeedsAttachment = a certificate may be asked for — see evidenceReason)
 //                  MinNoticeDays, MaxDaysBeforeSenior (number), PayrollCode (text),
 //                  Contractors (yes/no — offered to contractors)
 //   LeaveRequests  Title (person), Email, PersonType (Staff/Contractor), PersonId, Site,
@@ -205,6 +206,21 @@ async function updateRequest(token, listId, id, fields) {
 const stamp = (who, what) => `${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC — ${what}${who ? ' (' + who + ')' : ''}`;
 const addHistory = (r, line) => (r.history ? r.history + '\n' : '') + line;
 
+// ---------- evidence rule ----------
+// The NES (s 107) lets us ask for evidence only when there's a reason, so for types ticked
+// NeedsAttachment a certificate / stat dec is needed when the absence is more than one
+// working day, or a single day next to a weekend or public holiday (AEL Company Manual
+// 6.14.3). A supervisor can also ask for one. Needed → a "Certificate needed" History line.
+function evidenceReason(type, days, holidays) {
+  if (!type || !type.needsAttachment || !days.length) return '';
+  if (days.length > 1) return `${days.length} working days off`;
+  const h = holidays || {};
+  const off = d => { const wd = new Date(msOf(d)).getUTCDay(); return wd === 0 || wd === 6 || !!h[d]; };
+  const t = msOf(days[0]);
+  return off(isoOf(t - 86400000)) || off(isoOf(t + 86400000)) ? 'next to a weekend or public holiday' : '';
+}
+const needsEvidence = r => /Certificate needed/.test(r.history || '') && !r.evidenceUrl;
+
 // ---------- rules (staff, non-entitlement types) ----------
 // For each day, how many OTHER people at the site are already off (pending or approved).
 function othersOff(requests, site, days, excludeId, excludeEmail) {
@@ -299,5 +315,5 @@ module.exports = {
   ACTIVE, FINAL_OK, yes, findList, listItems, leaveSwitch, leaveOnFor, getLeaveSites, getLeaveTypes, typesForSite,
   publicName, isoOf, msOf, validDate, tzForSite, todayIn, datesBetween, workingDays, zonedMidnightUtc,
   getRequests, daysOf, createRequest, updateRequest, stamp, addHistory, othersOff, evaluateRules, fmtDay,
-  addTimeOff, removeTimeOff, uploadEvidence,
+  addTimeOff, removeTimeOff, uploadEvidence, evidenceReason, needsEvidence,
 };

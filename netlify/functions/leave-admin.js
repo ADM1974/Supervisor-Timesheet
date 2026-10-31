@@ -1,6 +1,7 @@
 // Leave approvals for supervisors. POST { action }:
 //   list                       → leave waiting for me at my sites + upcoming approved leave
 //   decide { id, action:'approve'|'decline', reason }
+//   askevidence { id }         → ask for a certificate / stat dec (entitlement types)
 //
 // Approve: contractors → Approved. Entitlement types (sick, carer's, FDV…) → Acknowledged.
 // Staff leave that breaks a rule (see leave-core.js: senior-only type, short notice, long,
@@ -57,7 +58,8 @@ exports.handler = async (event) => {
         return {
           id: r.id, name: r.name, site: r.site, type: r.type, personType: r.personType, start: r.start, end: r.end,
           days: days.length, hours: r.hours, note: r.note, rules: r.rules, evidenceUrl: r.evidenceUrl,
-          entitlement: !!(t && t.entitlement), needsAttachment: !!(t && t.needsAttachment), status: r.status,
+          entitlement: !!(t && t.entitlement), needsAttachment: L.needsEvidence(r), status: r.status,
+          canAskEvidence: !!(t && t.entitlement) && !r.evidenceUrl && !L.needsEvidence(r),
           held, heldBy: held ? ((/Supervisor OK by ([^\n(]+?)\s*(?:—|\(|$)/m.exec(r.history) || [])[1] || '') : '',
           canAct: !held || senior(r.site), siteMax: (leaveSites[r.site] || {}).max || 0, busy,
         };
@@ -73,6 +75,14 @@ exports.handler = async (event) => {
     const r = requests.find(x => x.id === String(data.id || ''));
     if (!r || !mySite.has(r.site)) return reply(404, { ok: false, error: 'Request not found.' });
     if (isMine(r)) return reply(400, { ok: false, error: 'You can’t approve your own leave.' });
+    if (String(data.action || '') === 'askevidence') {
+      if (['Declined', 'Cancelled'].includes(r.status)) return reply(400, { ok: false, error: `This request is ${r.status.toLowerCase()}.` });
+      if (L.needsEvidence(r) || r.evidenceUrl) return reply(200, { ok: true, status: 'asked' });
+      await L.updateRequest(token, listId, r.id, { History: L.addHistory(r, L.stamp(user.name, 'Certificate needed — asked by the supervisor')) });
+      await emailPerson(token, r.email, `Certificate needed: ${rangeTxt(r)}`,
+        `<p>Hi ${escH(r.name.split(' ')[0])},</p><p>${escH(user.name)} has asked for a medical certificate or statutory declaration for your leave on <b>${escH(rangeTxt(r))}</b>. Please add it in the app (Leave tab → Add certificate).</p>`);
+      return reply(200, { ok: true, status: 'asked' });
+    }
     if (!['Pending', 'Supervisor OK'].includes(r.status)) return reply(400, { ok: false, error: `This request is already ${r.status.toLowerCase()}.` });
     const action = String(data.action || '');
     const t = typeOf(r);
@@ -117,7 +127,7 @@ exports.handler = async (event) => {
     await L.updateRequest(token, listId, r.id, { Status: status, RulesBroken: rules.join('\n'), History: history, Notified: status, ...(timeOffId ? { ShiftsTimeOffId: timeOffId } : {}) });
     await emailPerson(token, r.email, `Leave ${status.toLowerCase()}: ${rangeTxt(r)}`,
       `<p>Hi ${escH(r.name.split(' ')[0])},</p><p>Your ${escH(r.type)} for <b>${escH(rangeTxt(r))}</b> has been ${status === 'Acknowledged' ? 'recorded' : 'approved'} by ${escH(who)}.</p>`
-      + (t && t.needsAttachment && !r.evidenceUrl ? '<p>Please add your medical certificate or statutory declaration in the app (Leave tab).</p>' : ''));
+      + (L.needsEvidence(r) ? '<p>Please add your medical certificate or statutory declaration in the app (Leave tab).</p>' : ''));
     return reply(200, { ok: true, status, shifts: !!timeOffId, shiftsError: shiftsNote || '' });
   } catch (err) {
     console.error('leave-admin', err);

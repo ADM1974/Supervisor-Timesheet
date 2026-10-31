@@ -33,17 +33,32 @@ Type the column names exactly as shown (no spaces) when creating them.
 | Entitlement | Yes/No | sick, carer's, compassionate, FDV… — no rules, supervisor **acknowledges** |
 | Confidential | Yes/No | shown to others only as "Leave" (e.g. Family & Domestic Violence) |
 | AllowPastDates | Yes/No | can be entered after the fact (sick) |
-| NeedsAttachment | Yes/No | asks for a medical certificate / stat dec |
+| NeedsAttachment | Yes/No | a certificate / stat dec is needed when it's **more than 1 working day** or a single day **next to a weekend or public holiday** (supervisors can also ask) |
 | SeniorApproval | Yes/No | always needs the senior approver (e.g. Long Service) |
 | MinNoticeDays | Number | less notice → senior approver (e.g. Annual = 28) |
 | MaxDaysBeforeSenior | Number | longer → senior approver (e.g. Annual = 10) |
 | PayrollCode | Single line | for the future Xero link |
 | Contractors | Yes/No | offered to contractors (none ticked → contractors get "Unavailable") |
 
-Suggested rows: Annual Leave · Personal/Sick (Entitlement, AllowPastDates, NeedsAttachment) ·
-Carer's (Entitlement, AllowPastDates) · Compassionate (Entitlement, AllowPastDates) ·
-Family & Domestic Violence (Entitlement, Confidential, AllowPastDates) · Community Service
-(Entitlement) · Long Service (SeniorApproval) · Parental (unpaid) · Unpaid · Time in Lieu.
+Suggested rows (the AEL baseline — `LeaveTypes_baseline.xlsx`):
+
+| Type | Settings | Why |
+|---|---|---|
+| Annual Leave | MinNoticeDays 28, MaxDaysBeforeSenior 10 | NES s 88: by agreement, not unreasonably refused; no award notice period. 4 weeks is AEL's *preferred* notice, so shorter goes to the senior approver rather than being refused |
+| Personal/Sick | Entitlement, AllowPastDates, NeedsAttachment | NES s 107: notice as soon as practicable; evidence when there's a reason (Company Manual 6.14.3) |
+| Carer's | Entitlement, AllowPastDates, NeedsAttachment | as sick |
+| Compassionate | Entitlement, AllowPastDates | evidence only if the supervisor asks |
+| Family & Domestic Violence | Entitlement, Confidential, AllowPastDates | NES s 106J–L, kept confidential |
+| Community Service | Entitlement | NES s 110 |
+| Long Service | SeniorApproval, MinNoticeDays 28 | state LSL Acts |
+| Parental | SeniorApproval, **MinNoticeDays 70** | NES s 74: 10 weeks' written notice |
+| Unpaid | SeniorApproval | discretionary |
+| Time in Lieu | MinNoticeDays 7, MaxDaysBeforeSenior 5 | award cl 32.8, by agreement |
+
+The agreements are Award Free; if the Manufacturing Award (MA000010) applies it adds no
+employee notice rule — only **shutdowns** (cl 34.7: 28 days' written notice) and directing
+**excess leave** (cl 34.9–34.11: over 8 weeks, starting 8 weeks–12 months out, at least a
+week, leaving 6 weeks). Those are supervisor-booked leave, which the app doesn't do yet.
 
 **LeaveRequests** — written by the apps
 
