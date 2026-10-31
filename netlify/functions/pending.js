@@ -3,7 +3,7 @@
 // work-order lines + hours, the group total, and the row ids to action.
 // Weeks over the worker's contract hours carry contract / overBy, and once the supervisor
 // has OK'd them, held = true until the site's senior approver approves (canSenior).
-const { getAppToken, validateSupervisorToken, getSupervisorSites, getSubmittedForSites, ownsRow, getSitesDetailed, nextPayrollSend, weekStartOf, personWeekKey, jobAllowancesOf, getContractHours, isSeniorFor, HELD_RE } = require('./supervisor');
+const { getAppToken, validateSupervisorToken, getSupervisorSites, getSubmittedForSites, ownsRow, getSitesDetailed, nextPayrollSend, weekStartOf, personWeekKey, jobAllowancesOf, getContractHours, isSeniorFor, HELD_RE, mayApproveOwn } = require('./supervisor');
 
 exports.handler = async (event) => {
   const headers = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
@@ -24,14 +24,14 @@ exports.handler = async (event) => {
       if (info) { const t = nextPayrollSend(info.closeDayIndex); if (!nextSend || t < nextSend) nextSend = t; }
     }
 
-    const [rows, contracts] = await Promise.all([getSubmittedForSites(token, sites), getContractHours(token)]);
+    const [rows, contracts, selfOk] = await Promise.all([getSubmittedForSites(token, sites), getContractHours(token), mayApproveOwn(token, user.email)]);
 
     // Group by person + Monday-based week. ContractorId is the stable per-person
     // key; fall back to the name if it's missing on a row.
     const groups = {};
     for (const it of rows) {
       const f = it.fields || {};
-      if (ownsRow(f, user)) continue;                     // nobody approves their own timesheet
+      if (!selfOk && ownsRow(f, user)) continue;          // nobody approves their own timesheet (unless Settings: SelfApprove, for testing)
       const date = String(f.EntryDate || '').slice(0, 10);
       const key = personWeekKey(f);
       if (!groups[key]) {

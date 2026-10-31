@@ -8,7 +8,7 @@
 // Over contract: a week with more hours than the worker's contract (Workers.ContractHours)
 // needs the site's senior approver too. A supervisor's Approve then only marks it
 // "awaiting senior approval" (still Submitted); the senior approver's Approve approves it.
-const { getAppToken, validateSupervisorToken, getSupervisorSites, getSubmittedForSites, updateItem, ownsRow, overContract } = require('./supervisor');
+const { getAppToken, validateSupervisorToken, getSupervisorSites, getSubmittedForSites, updateItem, ownsRow, overContract, mayApproveOwn } = require('./supervisor');
 
 exports.handler = async (event) => {
   const headers = { 'Content-Type': 'application/json' };
@@ -35,7 +35,8 @@ exports.handler = async (event) => {
     // Re-fetch what's actually Submitted for this supervisor's sites; only ids
     // present in that set are allowed to be actioned.
     const rows = await getSubmittedForSites(token, sites);
-    const allowed = new Map(rows.filter(it => !ownsRow(it.fields, user)).map(it => [String(it.id), it]));
+    const selfOk = await mayApproveOwn(token, user.email);           // testing switch (Settings: SelfApprove)
+    const allowed = new Map(rows.filter(it => selfOk || !ownsRow(it.fields, user)).map(it => [String(it.id), it]));
     const targets = ids.filter(id => allowed.has(id));
     if (!targets.length) return bad('nothing to update');
 

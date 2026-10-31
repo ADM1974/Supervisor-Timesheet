@@ -8,7 +8,7 @@
 // approver as well: a supervisor's Approve makes it "Supervisor OK" and the senior
 // approver's Approve makes it Approved. Approved staff leave goes on the person's Teams
 // Shifts schedule as "Leave" (the type is never shown on the roster).
-const { getAppToken, validateSupervisorToken, getSupervisorSites, getSitesDetailed, isSeniorFor } = require('./supervisor');
+const { getAppToken, validateSupervisorToken, getSupervisorSites, getSitesDetailed, isSeniorFor, mayApproveOwn } = require('./supervisor');
 const L = require('./leave-core');
 
 const headers = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
@@ -37,15 +37,15 @@ exports.handler = async (event) => {
   try {
     const token = await getAppToken();
     if (!L.leaveOnFor(await L.leaveSwitch(token), me)) return reply(200, { ok: true, on: false });
-    const [sites, detailed, types, leaveSites, { listId, requests }] = await Promise.all([
-      getSupervisorSites(token, me), getSitesDetailed(token), L.getLeaveTypes(token), L.getLeaveSites(token), L.getRequests(token),
+    const [sites, detailed, types, leaveSites, { listId, requests }, selfOk] = await Promise.all([
+      getSupervisorSites(token, me), getSitesDetailed(token), L.getLeaveTypes(token), L.getLeaveSites(token), L.getRequests(token), mayApproveOwn(token, me),
     ]);
     if (!listId) return reply(200, { ok: true, on: true, setup: 'Create the LeaveRequests list in SharePoint to start (see the README).' });
     const mySite = new Set(sites);
     const typeOf = r => types.find(t => t.title === r.type) || null;
     const senior = site => isSeniorFor(user, [site], detailed);
     const today = L.todayIn('Australia/Sydney');
-    const isMine = r => (r.email && r.email === me) || r.personId === user.id;
+    const isMine = r => !selfOk && ((r.email && r.email === me) || r.personId === user.id);   // Settings: SelfApprove lets testers act on their own
 
     if (String(data.action || 'list') === 'list') {
       const waiting = requests.filter(r => mySite.has(r.site) && ['Pending', 'Supervisor OK'].includes(r.status) && !isMine(r));

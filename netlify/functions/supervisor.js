@@ -65,6 +65,30 @@ async function findListId(token, name) {
   return list ? list.id : null;
 }
 
+// TESTING ONLY: people allowed to approve their OWN timesheets and leave. Settings list
+// row Title "SelfApprove", Value = email(s) separated by , ; or spaces. Blank / no row =
+// nobody (the normal rule). Re-read at most once a minute.
+let _self = null, _selfAt = 0;
+async function mayApproveOwn(token, email) {
+  const me = String(email || '').trim().toLowerCase();
+  if (!me) return false;
+  if (!_self || Date.now() - _selfAt > 60000) {
+    let set = new Set();
+    try {
+      const id = await findListId(token, 'Settings');
+      if (id) {
+        const r = await fetch(`${graphBase()}/lists/${id}/items?expand=fields&$top=999`, { headers: { Authorization: 'Bearer ' + token } });
+        if (r.ok) {
+          const row = ((await r.json()).value || []).map(it => it.fields || {}).find(f => String(f.Title || '').trim().toLowerCase() === 'selfapprove');
+          if (row) set = new Set(String(row.Value || '').split(/[;,\s]+/).map(x => x.trim().toLowerCase()).filter(x => x.includes('@')));
+        }
+      }
+    } catch (e) { console.warn('self-approve setting', e.message); }
+    _self = set; _selfAt = Date.now();
+  }
+  return _self.has(me);
+}
+
 // Turns a manager's name into the company email — format: first-initial.surname@ael.co
 // (e.g. "Andrew Corner" → a.corner@ael.co). Returns '' if it can't form one.
 function emailFromName(name) {
@@ -353,3 +377,4 @@ exports.getContractHours = getContractHours;
 exports.isSeniorFor = isSeniorFor;
 exports.overContract = overContract;
 exports.HELD_RE = HELD_RE;
+exports.mayApproveOwn = mayApproveOwn;

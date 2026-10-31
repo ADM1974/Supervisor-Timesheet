@@ -9,7 +9,7 @@
 //
 // Over contract (after the changes): as decide.js — a supervisor's save keeps the week
 // Submitted, "awaiting senior approval"; the senior approver's save approves it.
-const { getAppToken, validateSupervisorToken, getSupervisorSites, getSubmittedForSites, updateItem, deleteItem, ownsRow, overContract } = require('./supervisor');
+const { getAppToken, validateSupervisorToken, getSupervisorSites, getSubmittedForSites, updateItem, deleteItem, ownsRow, overContract, mayApproveOwn } = require('./supervisor');
 
 exports.handler = async (event) => {
   const headers = { 'Content-Type': 'application/json' };
@@ -33,7 +33,8 @@ exports.handler = async (event) => {
     if (!sites.length) return { statusCode: 403, headers, body: JSON.stringify({ ok: false, error: 'no sites' }) };
 
     const rows = await getSubmittedForSites(token, sites);
-    const allowed = new Map(rows.filter(it => !ownsRow(it.fields, user)).map(it => [String(it.id), it]));
+    const selfOk = await mayApproveOwn(token, user.email);           // testing switch (Settings: SelfApprove)
+    const allowed = new Map(rows.filter(it => selfOk || !ownsRow(it.fields, user)).map(it => [String(it.id), it]));
     const targets = ids.filter(id => allowed.has(id));
     if (!targets.length) return bad('nothing to update');
 
