@@ -1,5 +1,8 @@
 // Approve or reject a group of submitted timesheet rows.
-// Body: { ids:[...], action:'approve'|'reject', reason? }
+// Body: { ids:[...], action:'approve'|'reject', reason?, rejectDates? }
+// A reject can send back only some days (rejectDates): the rest of the card is approved in
+// the same step, so those days still get paid. No rejectDates = the whole card goes back.
+// The worker's app then locks the approved days, so fixing the rest never touches them.
 //
 // Security: we re-check server-side that EVERY id is currently a Submitted row
 // whose Site is one the supervisor manages — so a supervisor can't approve rows
@@ -44,43 +47,52 @@ exports.handler = async (event) => {
     const when = nowIso.slice(0, 16).replace('T', ' ');                       // e.g. 2026-06-27 14:32
     const who = user.name ? (user.name + ' <' + user.email + '>') : user.email;
 
-    const oc = action === 'approve' ? await overContract(token, user, rows, targets) : null;
-    if (oc && oc.overBy > 0 && !oc.senior) {
-      if (oc.held) return bad('This week is over contract and is waiting for the senior approver.');
-      const stamp = `Supervisor OK by ${who} on ${when} — ${oc.overBy} h over the ${oc.contract} h contract, awaiting senior approval`;
-      for (const id of targets) {
-        const prev = String((allowed.get(id).fields || {}).Notes || '').trim();
-        await updateItem(token, id, { Notes: prev ? (prev + ' · ' + stamp) : stamp });
-      }
-      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, updated: 0, held: targets.length, overBy: oc.overBy }) };
-    }
-    const overNote = oc && oc.overBy > 0 ? ` (incl. ${oc.overBy} h over the ${oc.contract} h contract)` : '';
-    let updated = 0;
-    for (const id of targets) {
+    // Which rows go back and which are approved
+    const dateOf = id => String((allowed.get(id).fields || {}).EntryDate || '').slice(0, 10);
+    const pick = action === 'reject' && Array.isArray(data.rejectDates) && data.rejectDates.length
+      ? new Set(data.rejectDates.map(d => String(d).slice(0, 10))) : null;
+    const rejectSet = new Set(action === 'reject' ? targets.filter(id => !pick || pick.has(dateOf(id))) : []);
+    if (action === 'reject' && !rejectSet.size) return bad('Tick at least one day to send back.');
+    const approveIds = targets.filter(id => !rejectSet.has(id));
+
+    const decideRow = async (id, status, stamp, extra) => {
       const prev = String((allowed.get(id).fields || {}).Notes || '').trim();
-      const verb = action === 'approve' ? 'Approved' : 'Rejected';
-      const stamp = verb + ' by ' + who + ' on ' + when + overNote + (action === 'reject' ? ' — ' + reason : '');
       const notes = prev ? (prev + ' · ' + stamp) : stamp;
-      const full = {
-        Status: action === 'approve' ? 'Approved' : 'Rejected',
-        ApprovedBy: who,                 // who actioned this row (approver, or rejecter)
-        ApprovedDate: nowIso,
-        Notes: notes,
-        ...(action === 'reject' ? { RejectionReason: reason } : {}),
-      };
       try {
-        await updateItem(token, id, full);
+        await updateItem(token, id, { Status: status, ApprovedBy: who, ApprovedDate: nowIso, Notes: notes, ...(extra || {}) });   // ApprovedBy = who actioned it (approver, or rejecter)
       } catch (e) {
         // The dedicated columns (ApprovedBy/ApprovedDate/RejectionReason) may not
         // exist on the Timesheets list yet — fall back so the decision still lands,
         // with who/when preserved in the Notes field regardless.
         console.warn('decide: full update failed, retrying minimal —', e.message);
-        await updateItem(token, id, { Status: full.Status, Notes: notes });
+        await updateItem(token, id, { Status: status, Notes: notes });
       }
-      updated++;
+    };
+
+    let rejected = 0;
+    for (const id of rejectSet) { await decideRow(id, 'Rejected', `Rejected by ${who} on ${when} — ${reason}`, { RejectionReason: reason }); rejected++; }
+
+    // Approve the rest. Hours sent back don't count towards the contract check.
+    let updated = 0;
+    if (approveIds.length) {
+      const oc = await overContract(token, user, rows, approveIds, it => rejectSet.has(String(it.id)) ? 0 : (Number((it.fields || {}).Hours) || 0));
+      if (oc.overBy > 0 && !oc.senior) {
+        if (oc.held) {
+          if (!rejected) return bad('This week is over contract and is waiting for the senior approver.');
+          return { statusCode: 200, headers, body: JSON.stringify({ ok: true, updated: 0, rejected }) };   // the rest stays with the senior approver
+        }
+        const stamp = `Supervisor OK by ${who} on ${when} — ${oc.overBy} h over the ${oc.contract} h contract, awaiting senior approval`;
+        for (const id of approveIds) {
+          const prev = String((allowed.get(id).fields || {}).Notes || '').trim();
+          await updateItem(token, id, { Notes: prev ? (prev + ' · ' + stamp) : stamp });
+        }
+        return { statusCode: 200, headers, body: JSON.stringify({ ok: true, updated: 0, rejected, held: approveIds.length, overBy: oc.overBy }) };
+      }
+      const overNote = oc.overBy > 0 ? ` (incl. ${oc.overBy} h over the ${oc.contract} h contract)` : '';
+      for (const id of approveIds) { await decideRow(id, 'Approved', `Approved by ${who} on ${when}${overNote}`); updated++; }
     }
 
-    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, updated }) };
+    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, updated, rejected }) };
   } catch (err) {
     console.error(err);
     return { statusCode: 502, headers, body: JSON.stringify({ ok: false, error: 'server' }) };

@@ -308,11 +308,19 @@ function weekStartOf(dateStr) {
   d.setUTCDate(d.getUTCDate() - back);
   return d.toISOString().slice(0, 10);
 }
-// One approval card = one person's week. ContractorId is the stable per-person key; the name if it's missing.
+// The pay week a row belongs to: the week start the worker's app stamps in BatchID
+// ("S-2026-10-07-AB12CD" / "C-…"), so a card is exactly the week they saved, not Monday to
+// Sunday (which split a Wednesday-to-Tuesday site week across two cards). Older rows
+// without one fall back to Monday.
+function payWeekOf(f) {
+  const m = /^[SC]-(\d{4}-\d{2}-\d{2})-/.exec(String(f.BatchID || '').trim());
+  return m ? m[1] : weekStartOf(String(f.EntryDate || '').slice(0, 10));
+}
+// One approval card = one person's pay week. ContractorId is the stable per-person key; the name if it's missing.
 function personWeekKey(f) {
   const person = String(f.ContractorId || f.Title || '').trim() || 'unknown';
   const date = String(f.EntryDate || '').slice(0, 10);
-  return person + '|' + (weekStartOf(date) || String(f.BatchID || '').trim() || date);
+  return person + '|' + (payWeekOf(f) || String(f.BatchID || '').trim() || date);
 }
 
 // A line's per-job allowances (staff app column JobAllowances, e.g. "Call-out, Call-Out - Working Hours").
@@ -395,6 +403,7 @@ exports.nextPayrollSend = nextPayrollSend;
 exports.nzNow = nzNow;
 exports.weekStartOf = weekStartOf;
 exports.personWeekKey = personWeekKey;
+exports.payWeekOf = payWeekOf;
 exports.jobAllowancesOf = jobAllowancesOf;
 exports.getContractHours = getContractHours;
 exports.isSeniorFor = isSeniorFor;

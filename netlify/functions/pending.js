@@ -3,7 +3,7 @@
 // work-order lines + hours, the group total, and the row ids to action.
 // Weeks over the worker's contract hours carry contract / overBy, and once the supervisor
 // has OK'd them, held = true until the site's senior approver approves (canSenior).
-const { getAppToken, validateSupervisorToken, getSupervisorSites, getWorkOrderEditorSites, getSubmittedForSites, ownsRow, getSitesDetailed, nextPayrollSend, weekStartOf, personWeekKey, jobAllowancesOf, getContractHours, isSeniorFor, HELD_RE, mayApproveOwn } = require('./supervisor');
+const { getAppToken, validateSupervisorToken, getSupervisorSites, getWorkOrderEditorSites, getSubmittedForSites, ownsRow, getSitesDetailed, nextPayrollSend, payWeekOf, personWeekKey, jobAllowancesOf, getContractHours, isSeniorFor, HELD_RE, mayApproveOwn } = require('./supervisor');
 
 exports.handler = async (event) => {
   const headers = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
@@ -36,16 +36,19 @@ exports.handler = async (event) => {
       const date = String(f.EntryDate || '').slice(0, 10);
       const key = personWeekKey(f);
       if (!groups[key]) {
-        groups[key] = { key, name: String(f.Title || '').trim() || 'Worker', siteSet: new Set(), weekStart: weekStartOf(date), ids: [], total: 0, byDate: {}, shiftByDate: {}, held: false, heldBy: '' };
+        groups[key] = { key, name: String(f.Title || '').trim() || 'Worker', siteSet: new Set(), weekStart: payWeekOf(f), ids: [], total: 0, byDate: {}, shiftByDate: {}, held: false, heldBy: '', resent: false, resentWhy: '' };
       }
       const g = groups[key];
       const hm = /Supervisor OK by ([^<·]+?)\s*(?:<[^>]*>)?\s+on [^·]*awaiting senior approval/i.exec(String(f.Notes || ''));
       if (HELD_RE.test(String(f.Notes || ''))) { g.held = true; if (hm && !g.heldBy) g.heldBy = hm[1].trim(); }
+      // the worker's app marks a week re-sent after the supervisor sent it back
+      const rs = /Re-sent after being sent back(?: \(“([^”]*)”\))?/.exec(String(f.Notes || ''));
+      if (rs) { g.resent = true; if (rs[1] && !g.resentWhy) g.resentWhy = rs[1]; }
       g.ids.push(it.id);
       if (f.Site) g.siteSet.add(String(f.Site).trim());
       const hr = Number(f.Hours) || 0;
       g.total += hr;
-      if (!g.weekStart && weekStartOf(date)) g.weekStart = weekStartOf(date);
+      if (!g.weekStart && payWeekOf(f)) g.weekStart = payWeekOf(f);
       if (!g.byDate[date]) g.byDate[date] = [];
       const allow = (String(f.RowType || '').toLowerCase() === 'allowance' || f.Allowance)
         ? (String(f.Allowance || '').trim() || 'Allowance')
@@ -70,6 +73,8 @@ exports.handler = async (event) => {
       overBy: contract ? Math.max(0, Math.round((total - contract) * 100) / 100) : 0,
       held: g.held,
       heldBy: g.heldBy,
+      resent: g.resent,
+      resentWhy: g.resentWhy,
       canSenior: isSeniorFor(user, siteList, detailed),
       ids: g.ids,
       days: Object.keys(g.byDate).sort().map(date => ({ date, lines: g.byDate[date], shiftWorked: (g.shiftByDate[date] || {}).worked || '', rosteredShift: (g.shiftByDate[date] || {}).rostered || '' })),

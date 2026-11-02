@@ -33,6 +33,12 @@
   .weekhead .rng{font-size:15px;font-weight:600;color:var(--ink);}
   /* ---- approval card ---- */
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px 14px;margin-bottom:13px;box-shadow:0 1px 2px rgba(16,24,40,.04);}
+  .rejbox{border-top:1px dashed var(--line);margin-top:8px;padding-top:9px;}
+  .rejbox .rejh{font-weight:700;font-size:14px;margin-bottom:2px;}
+  .rejday{display:flex;align-items:center;gap:9px;padding:7px 2px;font-size:14px;border-bottom:1px solid #f0f2f5;}
+  .rejday input{width:18px;height:18px;}
+  .rejday .rh{margin-left:auto;color:var(--muted);}
+  .rejbox textarea{width:100%;box-sizing:border-box;margin-top:9px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit;font-size:14px;}
   .card .hd{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:8px;}
   .card .who{font-weight:700;font-size:16px;}
   .card .sub{font-size:12px;color:var(--muted);margin-top:2px;}
@@ -357,6 +363,7 @@ function siteToggle(el){
 }
 
 let AMEND_KEY=null;
+let REJECT_KEY=null;   // the card showing "send back which days?"
 
 function cardHtml(g){
   if(g.key===AMEND_KEY) return amendCardHtml(g);
@@ -376,15 +383,38 @@ function cardHtml(g){
       <div class="gtot">${fmtHr(g.total)}</div>
     </div>
     ${contractNote(g)}
+    ${g.resent?`<div class="ocnote held">↩ Re-sent after being sent back${g.resentWhy?' (you said: “'+esc(g.resentWhy)+'”)':''}</div>`:''}
     ${days}
-    <div class="acts">
+    ${g.key===REJECT_KEY?rejectBoxHtml(g):`<div class="acts">
       ${g.held && !g.canSenior
         ? `<span class="waitnote">Waiting for the senior approver</span>`
         : `<button class="approve" onclick="decide('${esc(g.key)}','approve')">${g.held?'Approve extra hours':'Approve'}</button>
       <button class="amendbtn" onclick="startAmend('${esc(g.key)}')">Amend</button>`}
       <button class="reject" onclick="decide('${esc(g.key)}','reject')">Reject</button>
-    </div>
+    </div>`}
   </div>`;
+}
+// Reject: tick the day(s) that are wrong. The unticked days are approved at the same time,
+// so they still get paid; the worker's app locks them and only the ticked days come back.
+function rejectBoxHtml(g){
+  const days=(g.days||[]).map(d=>{
+    const hrs=(d.lines||[]).filter(l=>!l.allow).reduce((s,l)=>s+(Number(l.hr)||0),0);
+    return `<label class="rejday"><input type="checkbox" class="rejd" value="${esc(d.date)}" checked><span>${dayLabel(d.date)}</span><span class="rh">${fmtHr(hrs)}</span></label>`;
+  }).join('');
+  return `<div class="rejbox"><div class="rejh">Send back which days?</div>
+    <div class="meta">Untick the days that are right — they’re approved now and go to payroll.</div>
+    ${days}
+    <textarea id="rejWhy" rows="2" placeholder="Reason — the worker sees this"></textarea>
+    <div class="acts"><button class="reject" onclick="sendReject('${esc(g.key)}')">Send back</button>
+      <button class="amendbtn" onclick="REJECT_KEY=null;renderApprovals()">Cancel</button></div></div>`;
+}
+function sendReject(key){
+  const card=document.getElementById('card-'+cssId(key)); if(!card) return;
+  const ticked=[...card.querySelectorAll('.rejd')], dates=ticked.filter(x=>x.checked).map(x=>x.value);
+  const reason=(card.querySelector('#rejWhy')||{}).value||'';
+  if(!dates.length){ toast('Tick at least one day to send back — or Cancel and Approve.'); return; }
+  if(!reason.trim()){ toast('Give a reason — the worker sees it.'); return; }
+  decide(key,'reject',{ reason:reason.trim(), rejectDates:dates.length===ticked.length?null:dates });
 }
 // Per-job allowances on a work-order line (e.g. Call-out, Call-Out - Working Hours).
 function jobTags(l){ return (l.jobs||[]).map(j=>`<span class="cotag">${esc(j)}</span>`).join(''); }
@@ -628,27 +658,27 @@ async function sendPayroll(which){
   finally{ if(btn){ btn.disabled=false; btn.textContent='📧 Email last week’s payroll report'; } }
 }
 
-async function decide(key, action){
+async function decide(key, action, rej){
   const g=GROUPS.find(x=>x.key===key);
   if(!g) return;
-  let reason='';
-  if(action==='reject'){
-    reason=(prompt('Reason for rejecting '+g.name+'’s timesheet?')||'').trim();
-    if(!reason){ return; }
-  }
+  if(action==='reject' && !rej){ REJECT_KEY=key; AMEND_KEY=null; renderApprovals(); return; }   // first: pick the days
+  const reason=rej?rej.reason:'';
   const card=document.getElementById('card-'+cssId(key));
   const btns=card?card.querySelectorAll('button'):[];
   btns.forEach(b=>b.disabled=true);
   try{
-    const res=await api('/.netlify/functions/decide',{ ids:g.ids, action, reason });
+    const res=await api('/.netlify/functions/decide',{ ids:g.ids, action, reason, ...(rej&&rej.rejectDates?{rejectDates:rej.rejectDates}:{}) });
     if(res.status===401){ toast('Please sign in again'); btns.forEach(b=>b.disabled=false); return; }
     const data=await res.json();
     if(!data.ok){ if(data.error && res.status===400){ toast(data.error); btns.forEach(b=>b.disabled=false); return; } throw new Error('decide'); }
-    if(data.held){ toast(`OK’d — ${g.name}’s week is ${fmtHr(data.overBy)} over contract, sent to the senior approver`); await loadPending(); return; }
+    if(action==='reject') REJECT_KEY=null;
+    const sentBack=rej&&rej.rejectDates?`Sent back ${rej.rejectDates.length} day${rej.rejectDates.length===1?'':'s'} of ${g.name}’s week`:'';
+    if(data.held){ toast(`${sentBack?sentBack+'; the rest':'OK’d — '+g.name+'’s week'} is ${fmtHr(data.overBy)} over contract, sent to the senior approver`); await loadPending(); return; }
+    if(sentBack && !data.updated){ toast(sentBack+' — the rest is with the senior approver'); await loadPending(); return; }
     GROUPS=GROUPS.filter(x=>x.key!==key);
     renderApprovals();
     const by=userEmail?(' · by '+userEmail):'';
-    toast(action==='approve'?`Approved ${g.name} — ${data.updated} ${data.updated===1?'entry':'entries'}${by}`:`Rejected ${g.name}${by}`);
+    toast(action==='approve'?`Approved ${g.name} — ${data.updated} ${data.updated===1?'entry':'entries'}${by}`:sentBack?`${sentBack}, approved the rest${by}`:`Rejected ${g.name}${by}`);
   }catch(e){ toast('Couldn’t save — check signal and try again'); btns.forEach(b=>b.disabled=false); }
 }
 function cssId(key){ return String(key).replace(/"/g,'&quot;'); }
@@ -668,7 +698,7 @@ function tickCountdown(){
 setInterval(tickCountdown,30000);
 
 /* Version badge (shown on every screen) + always-check-for-updates on load */
-const APP_VERSION='1.4';
+const APP_VERSION='1.5';
 document.getElementById('verbadge').textContent='v'+APP_VERSION;
 document.getElementById('signinVer').textContent='Version '+APP_VERSION;
 
