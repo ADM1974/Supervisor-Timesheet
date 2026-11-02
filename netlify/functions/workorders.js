@@ -1,13 +1,14 @@
 // Let a supervisor view / add / remove WORK ORDERS for THEIR sites, from the app.
 // Body: { action:'list' } | { action:'add', site, title } | { action:'addmany', items:[{site,title}] }
 //       | { action:'remove', id, site }
-// Security: every action is scoped to the sites the signed-in supervisor manages.
+// Security: every action is scoped to the sites the signed-in supervisor manages, plus any
+// site whose Sites.WorkOrderEditors names them (work orders only, no approvals).
 // Handles the WorkOrders "Site" column being a Lookup (writes SiteLookupId, resolved from
 // the Sites list), a multi-value Lookup ("Allow multiple values"), or plain text ("BNE; SYD").
 // One work order can be at several sites: adding a title that already exists adds the site
 // to that row, and removing it from a site only deletes the row once no site is left
 // (a single-value Lookup column can't hold two sites, so there it's one row per site).
-const { getAppToken, validateSupervisorToken, getSupervisorSites, findListId, graphBase } = require('./supervisor');
+const { getAppToken, validateSupervisorToken, getSupervisorSites, getWorkOrderEditorSites, findListId, graphBase } = require('./supervisor');
 
 async function woListId(token) {
   const r = await fetch(`${graphBase()}/lists?$select=id,displayName`, { headers: { Authorization: 'Bearer ' + token } });
@@ -49,7 +50,9 @@ exports.handler = async (event) => {
 
   try {
     const token = await getAppToken();
-    const sites = await getSupervisorSites(token, user.email);
+    // The supervisor's own sites, plus any where they're named in Sites.WorkOrderEditors.
+    const [supSites, edSites] = await Promise.all([getSupervisorSites(token, user.email), getWorkOrderEditorSites(token, user.email)]);
+    const sites = [...new Set([...supSites, ...edSites])].sort((a, b) => a.localeCompare(b));
     if (!sites.length) return { statusCode: 403, headers, body: '{"ok":false,"error":"no sites"}' };
     const siteSet = new Set(sites.map(s => s.trim().toLowerCase()));
     const listId = await woListId(token);

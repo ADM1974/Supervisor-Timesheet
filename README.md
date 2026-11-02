@@ -38,6 +38,14 @@ resolved. You don't need it unless the People Picker matching misses someone.
 > supervisor and check you see your sites). If anyone's sites don't show, add the
 > `ManagerEmail` column with their email as the fallback.
 
+## Work-order editors (no approval rights)
+
+To let someone set up work orders (jobs) for a site without being able to approve
+anything (e.g. office admin adding jobs for AU Office), add an optional column
+**`WorkOrderEditors`** (Single line of text) to the **Sites** list and put their name
+(first-initial.surname@ael.co format) or email on that site's row; separate several with
+`;`. When they sign in to this app they see only 🛠 Manage work orders for those sites.
+
 ## One-time setup
 
 ### 1. Create the "Supervisor Timesheet" app registration (admin)

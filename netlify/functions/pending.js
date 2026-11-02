@@ -3,7 +3,7 @@
 // work-order lines + hours, the group total, and the row ids to action.
 // Weeks over the worker's contract hours carry contract / overBy, and once the supervisor
 // has OK'd them, held = true until the site's senior approver approves (canSenior).
-const { getAppToken, validateSupervisorToken, getSupervisorSites, getSubmittedForSites, ownsRow, getSitesDetailed, nextPayrollSend, weekStartOf, personWeekKey, jobAllowancesOf, getContractHours, isSeniorFor, HELD_RE, mayApproveOwn } = require('./supervisor');
+const { getAppToken, validateSupervisorToken, getSupervisorSites, getWorkOrderEditorSites, getSubmittedForSites, ownsRow, getSitesDetailed, nextPayrollSend, weekStartOf, personWeekKey, jobAllowancesOf, getContractHours, isSeniorFor, HELD_RE, mayApproveOwn } = require('./supervisor');
 
 exports.handler = async (event) => {
   const headers = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
@@ -14,7 +14,8 @@ exports.handler = async (event) => {
     const token = await getAppToken();
     const sites = await getSupervisorSites(token, user.email);
     if (!sites.length) {
-      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, name: user.name, sites: [], groups: [] }) };
+      const woSites = await getWorkOrderEditorSites(token, user.email);   // work-order editors who don't approve
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true, name: user.name, sites: [], groups: [], woSites }) };
     }
 
     const detailed = await getSitesDetailed(token);

@@ -153,6 +153,28 @@ async function getSupervisorSites(token, email) {
     .sort((a, b) => a.localeCompare(b));
 }
 
+// Sites whose work orders this person may manage WITHOUT being an approver: the optional
+// Sites column "WorkOrderEditors" (Single line of text) holds names and/or emails,
+// separated by ; , or new lines (e.g. "Vicky Malafouris" or "v.malafouris@ael.co").
+// Being listed there gives no approval rights — it only opens 🛠 Manage work orders.
+async function getWorkOrderEditorSites(token, email) {
+  const want = String(email || '').trim().toLowerCase();
+  if (!want) return [];
+  const sitesListId = await findListId(token, 'Sites');
+  if (!sitesListId) return [];
+  const r = await fetch(`${graphBase()}/lists/${sitesListId}/items?expand=fields&$top=999`, { headers: { Authorization: 'Bearer ' + token } });
+  if (!r.ok) return [];
+  const out = [];
+  for (const it of ((await r.json()).value || [])) {
+    const f = it.fields || {};
+    const name = String(f.Title || '').trim();
+    if (!name || f.Active === false) continue;
+    const people = String(f.WorkOrderEditors || '').split(/[;,\n]/).map(x => x.trim()).filter(Boolean);
+    if (people.some(p => (p.includes('@') ? p.toLowerCase() : emailFromName(p)) === want)) out.push(name);
+  }
+  return out.sort((a, b) => a.localeCompare(b));
+}
+
 // All Submitted Timesheets rows whose Site is one of the supervisor's sites.
 // We $filter on Status (an indexed-or-not column) using the Prefer header, then
 // filter Site in code (Site is a choice; safest done locally).
@@ -356,6 +378,7 @@ exports.getAppToken = getAppToken;
 exports.validateSupervisorToken = validateSupervisorToken;
 exports.findListId = findListId;
 exports.getSupervisorSites = getSupervisorSites;
+exports.getWorkOrderEditorSites = getWorkOrderEditorSites;
 exports.getSubmittedForSites = getSubmittedForSites;
 exports.updateItem = updateItem;
 exports.deleteItem = deleteItem;
