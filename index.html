@@ -483,9 +483,10 @@ async function loadWorkOrders(){
 function renderWorkOrders(){
   const bySite={};
   (WO.sites||[]).forEach(s=>bySite[s]=[]);
-  (WO.workOrders||[]).forEach(w=>{ (bySite[w.site]=bySite[w.site]||[]).push(w); });
-  let html=(WO.sites||[]).map(site=>{
-    const rows=(bySite[site]||[]).map(w=>`<div class="worow"><span>${esc(w.title)}</span><button class="wodel" onclick="removeWO('${esc(String(w.id))}')" title="Remove">✕</button></div>`).join('')
+  (WO.workOrders||[]).forEach(w=>(w.sites||[]).forEach(s=>{ (bySite[s]=bySite[s]||[]).push(w); }));
+  let html=(WO.multiSite&&(WO.sites||[]).length>1?'<div class="meta" style="margin:0 0 8px">A work order can be at more than one site: type the same one under each site. ✕ takes it off that site only.</div>':'')+(WO.sites||[]).map(site=>{
+    const rows=(bySite[site]||[]).map(w=>{ const also=(w.sites||[]).filter(s=>s!==site);
+      return `<div class="worow"><span>${esc(w.title)}${also.length?` <span class="meta">· also ${esc(also.join(', '))}</span>`:''}</span><button class="wodel" onclick="removeWO('${esc(String(w.id))}','${esc(site)}')" title="Remove from ${esc(site)}">✕</button></div>`; }).join('')
       || '<div class="meta" style="padding:5px 0 2px">No work orders yet.</div>';
     return `<div class="card"><div class="who">${esc(site)}</div>${rows}
       <div class="woadd-lbl">Add work orders <span>— one per line</span></div>
@@ -512,10 +513,10 @@ async function saveWorkOrders(){
     loadWorkOrders();
   }catch(e){ toast('Couldn’t save — '+((e&&e.message)||'try again')); if(btn){ btn.disabled=false; btn.textContent='＋ Save new work orders'; } }
 }
-async function removeWO(id){
-  if(!confirm('Remove this work order from the list?')) return;
+async function removeWO(id,site){
+  if(!confirm('Remove this work order from '+site+'?')) return;
   try{
-    const res=await api('/.netlify/functions/workorders',{ action:'remove', id });
+    const res=await api('/.netlify/functions/workorders',{ action:'remove', id, site });
     const data=await res.json();
     if(!data.ok) throw new Error(data.error||'remove');
     toast('Removed'); loadWorkOrders();
@@ -660,7 +661,7 @@ function tickCountdown(){
 setInterval(tickCountdown,30000);
 
 /* Version badge (shown on every screen) + always-check-for-updates on load */
-const APP_VERSION='1.2';
+const APP_VERSION='1.3';
 document.getElementById('verbadge').textContent='v'+APP_VERSION;
 document.getElementById('signinVer').textContent='Version '+APP_VERSION;
 
