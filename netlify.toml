@@ -16,6 +16,13 @@
 [functions."payroll-reminder"]
   schedule = "0 20,21 * * *"
 
+# Payroll's own address: au-payroll.ael.co opens the payroll page (same site, same sign-in)
+[[redirects]]
+  from = "https://au-payroll.ael.co/"
+  to = "/payroll.html"
+  status = 200
+  force = true
+
 # Payroll page: au-approvals.ael.co/payroll
 [[redirects]]
   from = "/payroll"

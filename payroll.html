@@ -157,6 +157,8 @@ const pill=(cls,txt)=>`<span class="pill p-${cls}">${esc(txt)}</span>`;
 
 /* ---------- Microsoft sign-in (a pop-up when shown inside SharePoint, which won't let sign-in load in a frame) ---------- */
 (async function init(){
+  // On au-payroll.ael.co the sign-in pop-up comes back to this page: leave it for the page that opened it.
+  if(window.opener && window.opener!==window && /^msal\./.test(window.name||'')) return;
   const cfg=window.SUP_CONFIG||{};
   document.getElementById('newTabLink').href=location.href;
   if(IN_FRAME) document.getElementById('newTab').classList.remove('hidden');
