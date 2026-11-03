@@ -1,0 +1,57 @@
+# Payroll page
+
+**https://au-approvals.ael.co/payroll** is the page payroll uses to run the pay week. It's part of the approvals app, with the same Microsoft 365 sign-in, and it can sit on a SharePoint page.
+
+## What payroll can do
+
+- **See every site at a glance.** The home page shows each site's last finished pay week:
+  - approved hours, and how many people are approved;
+  - who's still waiting for approval, has been sent back, or hasn't submitted;
+  - leave hours;
+  - whether the week has been processed.
+- **Open a site's week.** You see everyone at that site, with hours per day, total, allowances and leave, plus a status for each person:
+  - Approved;
+  - Waiting for approval;
+  - Waiting for senior approver;
+  - Sent back;
+  - Not submitted.
+
+  Click a person to see their lines.
+- **Chase what's outstanding.** The Outstanding table lists everyone who isn't approved. Each person has an **Email** button, and **Email all outstanding** writes one email to all of them with everyone in Bcc. Both open a ready-written email in Outlook, and nothing is sent until you send it.
+- **Correct approved lines.** You can:
+  - change hours, work order or comment on a line;
+  - remove a line;
+  - add a line of hours or an allowance on any day of the week.
+
+  Write a reason, then **Save changes**. Each change is stamped on the line's Notes as "Payroll changed … (by you on date — reason)" and listed under **Payroll changes** for that person. A removed line is noted on the person's other lines. Only approved lines can be changed here: waiting and sent-back lines stay with the supervisor and the worker.
+- **Download Excel or PDF.** These hold the week's approved hours, in the same layout as the automatic payroll email. Approved leave is included too: a **Leave** sheet in Excel, and a Leave section in the PDF.
+- **Mark processed.** This stamps every approved line "Processed for payroll by … on …".
+  - Processed lines can't be changed here until you **Reopen week**.
+  - A line approved after processing (for example, a late approval) shows as **new**. The site card shows "Processed · 2 new lines" and the button changes to **Mark new lines processed**.
+
+## Setup
+
+1. **Give payroll access.** In the timesheet **Settings** list, add a row:
+   - **Title** `PayrollAdmins`
+   - **Value**: the payroll people's emails, separated by `;`
+
+   Senior approvers (Netlify `SENIOR_APPROVERS`) can use it too. Netlify env `PAYROLL_ADMINS` works as well.
+2. **Put it on SharePoint**, either way:
+   - **Embed it in a page.**
+     - First allow the domain. In **Site settings → HTML Field Security**, add `au-approvals.ael.co`.
+     - Then edit a page, add an **Embed** web part and paste:
+       `<iframe src="https://au-approvals.ael.co/payroll" width="100%" height="1100" style="border:0"></iframe>`
+     - Inside SharePoint, sign-in opens in a small pop-up window. Allow pop-ups if the browser asks.
+   - **Or add a link.** Use a Quick Links web part pointing to https://au-approvals.ael.co/payroll, which opens it full screen.
+
+No new SharePoint lists or columns are needed.
+
+## Who's expected at a site
+
+"Not submitted" comes from:
+- the **Workers** list (staff, by HomeSite / Site);
+- active **Contractors** (by Site).
+
+People are matched to their timesheets by name, or by the first-initial.surname@ael.co email. If someone shows twice, check that their name matches in Workers / Contractors.
+
+Code: `payroll.html`, `netlify/functions/payroll.js`. The Excel and PDF come from `report.js`.

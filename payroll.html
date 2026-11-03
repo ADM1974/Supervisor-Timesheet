@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#2958cc">
+<link rel="icon" href="icons/icon-192.png">
+<title>Timesheet Payroll</title>
+<style>
+  :root{
+    --brand:#2958cc;--brand-dark:#1d3f96;--bg:#f3f5fa;--card:#ffffff;--ink:#1f2329;--muted:#6a7280;--line:#e2e6ee;
+    --amber:#8a4b00;--amber-bg:#fdf0dc;--green:#0f6b39;--green-bg:#e3f4ea;--red:#a3241d;--red-bg:#fbe7e5;--blue-bg:#e8eefb;
+  }
+  *{box-sizing:border-box;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;}
+  html,body{margin:0;}
+  body{background:var(--bg);color:var(--ink);min-height:100vh;}
+  .hidden{display:none !important;}
+  .appbar{background:var(--brand);color:#fff;padding:12px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:20;}
+  .appbar img{height:15px;display:block;}
+  .appbar .ttl{font-size:15px;font-weight:600;flex:1;padding-left:12px;border-left:1px solid rgba(255,255,255,.4);}
+  .appbar .user{font-size:12px;background:rgba(255,255,255,.2);padding:5px 11px;border-radius:20px;cursor:pointer;border:0;color:#fff;}
+  .wrap{max-width:1180px;margin:0 auto;padding:18px 20px 60px;}
+  h1{font-size:20px;font-weight:600;margin:4px 0 4px;}
+  h2{font-size:15px;font-weight:600;margin:22px 0 10px;}
+  .meta{color:var(--muted);font-size:13px;line-height:1.5;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;}
+  .btn{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:8px;padding:8px 13px;font-size:13.5px;font-weight:600;cursor:pointer;white-space:nowrap;}
+  .btn:hover{border-color:#c5cbd8;}
+  .btn.primary{background:var(--brand);border-color:var(--brand);color:#fff;}
+  .btn.primary:hover{background:var(--brand-dark);}
+  .btn.small{padding:5px 9px;font-size:12.5px;}
+  .btn.link{border:0;background:none;color:var(--brand);padding:4px 6px;}
+  .btn:disabled{opacity:.5;cursor:default;}
+  select,input,textarea{font:inherit;font-size:13.5px;border:1px solid var(--line);border-radius:8px;padding:7px 9px;background:#fff;color:var(--ink);}
+  .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0 4px;}
+  .toolbar .grow{flex:1;}
+  .pill{display:inline-block;font-size:11.5px;font-weight:700;border-radius:20px;padding:3px 9px;white-space:nowrap;}
+  .p-approved{background:var(--green-bg);color:var(--green);}
+  .p-waiting,.p-senior{background:var(--amber-bg);color:var(--amber);}
+  .p-sentback,.p-missing{background:var(--red-bg);color:var(--red);}
+  .p-processed{background:var(--blue-bg);color:var(--brand-dark);}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;}
+  .sitecard{cursor:pointer;}
+  .sitecard:hover{border-color:#b9c4dc;}
+  .sitecard .nm{font-size:16px;font-weight:700;}
+  .sitecard .row{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
+  .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:14px 0;}
+  .metric{background:#fff;border:1px solid var(--line);border-radius:10px;padding:11px 14px;}
+  .metric .l{font-size:12px;color:var(--muted);}
+  .metric .v{font-size:22px;font-weight:600;margin-top:2px;}
+  .banner{border-radius:10px;padding:10px 14px;font-size:13.5px;margin:10px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  .banner.ok{background:var(--blue-bg);color:var(--brand-dark);}
+  .banner.warn{background:var(--amber-bg);color:var(--amber);}
+  table{width:100%;border-collapse:collapse;background:#fff;}
+  .tablewrap{border:1px solid var(--line);border-radius:10px;overflow-x:auto;background:#fff;}
+  th,td{padding:8px 10px;font-size:13px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top;}
+  th{font-size:11.5px;color:var(--muted);font-weight:700;background:#fafbfd;white-space:nowrap;}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+  tr.person{cursor:pointer;}
+  tr.person:hover td{background:#f8faff;}
+  tr.person.open td{background:#f3f6fd;}
+  tr.detail>td{background:#fbfcfe;padding:12px 14px 16px;}
+  .dim{color:#a3a9b5;}
+  .lines td{font-size:12.5px;background:#fff;}
+  .lines input{padding:5px 7px;font-size:12.5px;}
+  .lines .hr{width:70px;text-align:right;}
+  .lines .wo{width:100%;min-width:140px;}
+  .removed td{text-decoration:line-through;color:#a3a9b5;}
+  .addrow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:10px;}
+  .log{font-size:12px;color:var(--muted);margin-top:10px;}
+  .log div{padding:2px 0;}
+  .tag{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;border-radius:10px;padding:1px 7px;background:var(--amber-bg);color:var(--amber);margin-left:4px;}
+  .gate{max-width:420px;margin:70px auto;text-align:center;}
+  .err{color:var(--red);font-size:13px;margin-top:10px;}
+  #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:#1f2329;color:#fff;padding:10px 16px;border-radius:8px;font-size:13.5px;opacity:0;transition:.2s;pointer-events:none;z-index:50;}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  @media (max-width:640px){ .wrap{padding:14px 12px 50px;} .appbar{padding:10px 12px;} }
+</style>
+</head>
+<body>
+<div class="appbar">
+  <img src="icons/ael-logo-white.svg" alt="Airport Equipment">
+  <div class="ttl">Timesheet payroll</div>
+  <button class="user hidden" id="who" onclick="signOut()"></button>
+</div>
+
+<div class="gate" id="gate">
+  <div class="card">
+    <h1>Payroll</h1>
+    <p class="meta">Sign in with your AEL Microsoft 365 account.</p>
+    <button class="btn primary" onclick="signIn()">Sign in with Microsoft</button>
+    <div class="err" id="signErr"></div>
+    <p class="meta hidden" id="newTab" style="margin-top:14px">Sign-in blocked here? <a href="" target="_blank" rel="noopener" id="newTabLink">Open payroll in a new tab</a></p>
+  </div>
+</div>
+
+<div class="gate hidden" id="noAccess">
+  <div class="card">
+    <h1>No payroll access</h1>
+    <p class="meta" id="noAccessText"></p>
+  </div>
+</div>
+
+<div class="wrap hidden" id="app">
+  <!-- home: every site's last finished pay week -->
+  <div id="home">
+    <div class="toolbar">
+      <div class="grow"><h1>Pay weeks</h1><div class="meta" id="homeSub">Each site's last finished pay week. Pick one to open it.</div></div>
+      <select id="homeWeeks" onchange="loadHome()">
+        <option value="1">Last finished week</option>
+        <option value="0">Current week</option>
+        <option value="2">2 weeks ago</option>
+        <option value="3">3 weeks ago</option>
+      </select>
+      <button class="btn" onclick="loadHome()">Refresh</button>
+    </div>
+    <div class="grid" id="siteCards"><div class="meta">Loading…</div></div>
+  </div>
+
+  <!-- one site's week -->
+  <div id="week" class="hidden">
+    <div class="toolbar">
+      <button class="btn link" onclick="goHome()">← All sites</button>
+    </div>
+    <div class="toolbar">
+      <select id="siteSel" onchange="pickSite()"></select>
+      <button class="btn small" onclick="stepWeek(1)" aria-label="Earlier week">◀</button>
+      <select id="weekSel" onchange="pickWeek()"></select>
+      <button class="btn small" onclick="stepWeek(-1)" aria-label="Later week">▶</button>
+      <span class="grow"></span>
+      <button class="btn" onclick="download('xlsx')">Download Excel</button>
+      <button class="btn" onclick="download('pdf')">Download PDF</button>
+      <button class="btn primary" id="procBtn" onclick="markProcessed()">Mark processed</button>
+    </div>
+    <div id="weekBody"><div class="meta">Loading…</div></div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.27.0/lib/msal-browser.min.js"></script>
+<script src="config.js"></script>
+<script>
+const APP_VERSION='1.0';
+const SCOPES=['openid','profile','email'];
+const IN_FRAME=(()=>{ try{ return window.self!==window.top; }catch(_){ return true; } })();
+let msalInstance=null, account=null, ME=null, WEEK=null, OPEN=null, EDIT=null;
+
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),3200);}
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function fmtHr(n){const v=Math.round((Number(n)||0)*100)/100;return Number.isInteger(v)?v.toFixed(1):String(v);}
+function dayLabel(d){return new Date(d+'T00:00:00Z').toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short',timeZone:'UTC'});}
+function shortDay(d){return new Date(d+'T00:00:00Z').toLocaleDateString('en-AU',{weekday:'short',timeZone:'UTC'});}
+function weekLabel(ws,we){return dayLabel(ws)+' – '+dayLabel(we);}
+function addDays(d,n){return new Date(Date.parse(d+'T00:00:00Z')+n*86400000).toISOString().slice(0,10);}
+const STATUS={approved:'Approved',waiting:'Waiting for approval',senior:'Waiting for senior approver',sentback:'Sent back',missing:'Not submitted'};
+const pill=(cls,txt)=>`<span class="pill p-${cls}">${esc(txt)}</span>`;
+
+/* ---------- Microsoft sign-in (a pop-up when shown inside SharePoint, which won't let sign-in load in a frame) ---------- */
+(async function init(){
+  const cfg=window.SUP_CONFIG||{};
+  document.getElementById('newTabLink').href=location.href;
+  if(IN_FRAME) document.getElementById('newTab').classList.remove('hidden');
+  try{
+    msalInstance=new msal.PublicClientApplication({
+      auth:{ clientId:cfg.clientId, authority:'https://login.microsoftonline.com/'+cfg.tenantId, redirectUri:window.location.origin },
+      cache:{ cacheLocation:'localStorage' }
+    });
+    await msalInstance.initialize();
+    const resp=IN_FRAME?null:await msalInstance.handleRedirectPromise();
+    account=(resp&&resp.account)||msalInstance.getAllAccounts()[0]||null;
+    if(account){ msalInstance.setActiveAccount(account); start(); }
+  }catch(e){ document.getElementById('signErr').textContent='Sign-in error — try again.'; }
+})();
+async function signIn(){
+  if(!msalInstance) return;
+  document.getElementById('signErr').textContent='';
+  try{
+    if(IN_FRAME){
+      const r=await msalInstance.loginPopup({ scopes:SCOPES });
+      account=r.account; msalInstance.setActiveAccount(account); start();
+    }else await msalInstance.loginRedirect({ scopes:SCOPES, redirectStartPage:location.href });
+  }catch(e){ document.getElementById('signErr').textContent=/popup/i.test(String(e&&(e.errorCode||e.message)))?'Your browser blocked the sign-in window — allow pop-ups for this page, or open payroll in a new tab.':'Couldn’t sign in — try again.'; }
+}
+function signOut(){ if(!msalInstance||!account) return; if(IN_FRAME) msalInstance.logoutPopup({account}).then(()=>location.reload()).catch(()=>{}); else msalInstance.logoutRedirect({account}); }
+async function getToken(force){
+  try{
+    let res=await msalInstance.acquireTokenSilent({ account, scopes:SCOPES, forceRefresh:!!force });
+    const exp=((res.idTokenClaims||{}).exp||0)*1000;
+    if(!force&&exp&&exp-Date.now()<5*60000) res=await msalInstance.acquireTokenSilent({ account, scopes:SCOPES, forceRefresh:true });
+    return res.idToken;
+  }catch(e){
+    if(IN_FRAME){ const r=await msalInstance.acquireTokenPopup({ scopes:SCOPES, account }); return r.idToken; }
+    msalInstance.loginRedirect({ scopes:SCOPES, loginHint:account&&account.username, redirectStartPage:location.href }).catch(()=>{});
+    throw new Error('Signing you in again…');
+  }
+}
+async function api(body){
+  const send=t=>fetch('/.netlify/functions/payroll',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+t},body:JSON.stringify(body)});
+  let res=await send(await getToken(false));
+  if(res.status===401) res=await send(await getToken(true));
+  const j=await res.json().catch(()=>({ok:false,error:'server'}));
+  if(!res.ok||!j.ok) throw new Error(j.error&&j.error!=='server'?j.error:'Something went wrong — try again.');
+  return j;
+}
+
+/* ---------- start ---------- */
+async function start(){
+  document.getElementById('gate').classList.add('hidden');
+  const chip=document.getElementById('who'); chip.classList.remove('hidden');
+  chip.textContent=((account.name||'').split(' ')[0]||'Signed in')+' · Sign out';
+  try{ ME=await api({action:'me'}); }
+  catch(e){ document.getElementById('gate').classList.remove('hidden'); document.getElementById('signErr').textContent=e.message; return; }
+  if(!ME.admin){
+    document.getElementById('noAccess').classList.remove('hidden');
+    document.getElementById('noAccessText').textContent=`You're signed in as ${ME.email}, which isn't on the payroll list. Ask for your email to be added to the PayrollAdmins row in the timesheet Settings list.`;
+    return;
+  }
+  document.getElementById('app').classList.remove('hidden');
+  document.getElementById('siteSel').innerHTML=ME.sites.map(s=>`<option>${esc(s.name)}</option>`).join('');
+  const q=new URLSearchParams(location.hash.slice(1));
+  if(q.get('site')&&ME.sites.some(s=>s.name===q.get('site'))) openWeek(q.get('site'),q.get('week')||'');
+  else goHome();
+}
+window.addEventListener('hashchange',()=>{
+  if(!ME||!ME.admin) return;
+  const q=new URLSearchParams(location.hash.slice(1));
+  if(!q.get('site')){ if(!document.getElementById('week').classList.contains('hidden')) showHome(); }
+  else if(!WEEK||WEEK.site!==q.get('site')||WEEK.weekStart!==q.get('week')) openWeek(q.get('site'),q.get('week')||'');
+});
+
+/* ---------- home ---------- */
+function goHome(){ if(location.hash) history.pushState(null,'',location.pathname+location.search); showHome(); }
+function showHome(){
+  document.getElementById('week').classList.add('hidden');
+  document.getElementById('home').classList.remove('hidden');
+  WEEK=null; loadHome();
+}
+async function loadHome(){
+  const box=document.getElementById('siteCards');
+  box.innerHTML='<div class="meta">Loading…</div>';
+  try{
+    const r=await api({action:'overview',weeksBack:+document.getElementById('homeWeeks').value});
+    if(!r.sites.length){ box.innerHTML='<div class="meta">No active sites.</div>'; return; }
+    box.innerHTML=r.sites.map(s=>{
+      const m=s.summary, out=m.waiting+m.sentback+m.missing;
+      const proc=s.processed.state==='yes'?pill('processed','Processed'+(s.processed.by?' by '+s.processed.by.split(' ')[0]:''))
+        :s.processed.state==='partial'?pill('waiting',`Processed · ${s.processed.newSince} new line${s.processed.newSince===1?'':'s'}`):'';
+      return `<div class="card sitecard" onclick="openWeek('${esc(s.site).replace(/'/g,"\\'")}','${s.weekStart}')">
+        <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><div class="nm">${esc(s.site)}</div>${proc}</div>
+        <div class="meta">${weekLabel(s.weekStart,s.weekEnd)}</div>
+        <div class="metrics" style="grid-template-columns:1fr 1fr;margin:10px 0 0">
+          <div><div class="meta">Approved hours</div><div style="font-size:19px;font-weight:600">${fmtHr(m.approvedHours)}</div></div>
+          <div><div class="meta">People approved</div><div style="font-size:19px;font-weight:600">${m.approved} of ${m.people}</div></div>
+        </div>
+        <div class="row">${out?'':pill('approved','Everyone approved')}
+          ${m.waiting?pill('waiting',m.waiting+' waiting'):''}${m.sentback?pill('sentback',m.sentback+' sent back'):''}${m.missing?pill('missing',m.missing+' not submitted'):''}
+          ${m.leaveHours?pill('processed',fmtHr(m.leaveHours)+' h leave'):''}</div>
+      </div>`;
+    }).join('');
+  }catch(e){ box.innerHTML=`<div class="err">${esc(e.message)}</div>`; }
+}
+
+/* ---------- one site's week ---------- */
+function siteWeeks(site){ return ((ME.sites.find(s=>s.name===site)||{}).weeks)||[]; }
+function openWeek(site,weekStart){
+  const weeks=siteWeeks(site);
+  if(!weekStart) weekStart=(weeks[1]||weeks[0]||{}).weekStart;
+  document.getElementById('home').classList.add('hidden');
+  document.getElementById('week').classList.remove('hidden');
+  document.getElementById('siteSel').value=site;
+  fillWeeks(site,weekStart);
+  const h='#site='+encodeURIComponent(site)+'&week='+weekStart;
+  if(location.hash!==h) history.pushState(null,'',h);
+  loadWeek(site,weekStart);
+}
+function fillWeeks(site,weekStart){
+  const weeks=siteWeeks(site).slice();
+  if(weekStart&&!weeks.some(w=>w.weekStart===weekStart)) weeks.push({weekStart,weekEnd:addDays(weekStart,6)});
+  document.getElementById('weekSel').innerHTML=weeks.map(w=>`<option value="${w.weekStart}"${w.weekStart===weekStart?' selected':''}>${weekLabel(w.weekStart,w.weekEnd)}${w.current?' (current)':''}</option>`).join('');
+}
+function pickSite(){ const s=document.getElementById('siteSel').value; const w=siteWeeks(s); openWeek(s,(w[1]||w[0]).weekStart); }
+function pickWeek(){ openWeek(document.getElementById('siteSel').value,document.getElementById('weekSel').value); }
+function stepWeek(dir){ const sel=document.getElementById('weekSel'); const i=sel.selectedIndex+dir; if(i>=0&&i<sel.options.length){ sel.selectedIndex=i; pickWeek(); } }
+
+async function loadWeek(site,weekStart){
+  const body=document.getElementById('weekBody');
+  body.innerHTML='<div class="meta">Loading…</div>';
+  OPEN=null; EDIT=null;
+  try{ WEEK=await api({action:'week',site,weekStart}); renderWeek(); }
+  catch(e){ body.innerHTML=`<div class="err">${esc(e.message)}</div>`; }
+}
+function weekDays(){ return Array.from({length:7},(_,i)=>addDays(WEEK.weekStart,i)); }
+
+function renderWeek(){
+  const w=WEEK, m=w.summary, days=weekDays();
+  const out=w.people.filter(p=>p.status!=='approved');
+  const btn=document.getElementById('procBtn');
+  btn.textContent=w.processed.state==='yes'?'Reopen week':w.processed.state==='partial'?'Mark new lines processed':'Mark processed';
+  btn.className='btn'+(w.processed.state==='yes'?'':' primary');
+  let html='';
+  if(w.processed.state==='yes') html+=`<div class="banner ok">✓ Processed by ${esc(w.processed.by)} on ${esc(w.processed.when)} UTC. Lines are locked until the week is reopened.</div>`;
+  if(w.processed.state==='partial') html+=`<div class="banner warn">Processed by ${esc(w.processed.by)} on ${esc(w.processed.when)} UTC, but ${w.processed.newSince} line${w.processed.newSince===1?' was':'s were'} approved after that. They're marked <span class="tag">new</span> below.</div>`;
+  html+=`<div class="metrics">
+    <div class="metric"><div class="l">Approved hours</div><div class="v">${fmtHr(m.approvedHours)}</div></div>
+    <div class="metric"><div class="l">People approved</div><div class="v">${m.approved} of ${m.people}</div></div>
+    <div class="metric"><div class="l">Still outstanding</div><div class="v" style="color:${out.length?'var(--red)':'var(--green)'}">${out.length}</div></div>
+    <div class="metric"><div class="l">Leave hours</div><div class="v">${fmtHr(m.leaveHours)}</div></div>
+  </div>`;
+  if(out.length){
+    const emails=out.map(p=>p.email).filter(Boolean);
+    html+=`<h2>Outstanding</h2><div class="tablewrap"><table><thead><tr><th>Name</th><th>Type</th><th>Status</th><th class="num">Hours so far</th><th></th></tr></thead><tbody>
+      ${out.map(p=>`<tr><td>${esc(p.name)}</td><td>${esc(p.type||'')}</td><td>${pill(p.status,STATUS[p.status])}${p.status==='sentback'?`<div class="meta">${esc(reasonOf(p))}</div>`:''}</td><td class="num">${p.lines.length?fmtHr(p.total):'<span class="dim">–</span>'}</td>
+        <td class="num">${p.email?`<a class="btn small" href="${chaseLink([p.email],p)}">Email</a>`:'<span class="meta">no email</span>'}</td></tr>`).join('')}
+      </tbody></table></div>
+      ${emails.length>1?`<div class="toolbar"><a class="btn small" href="${chaseLink(emails)}">Email all ${emails.length} outstanding</a><span class="meta">Opens a new email in Outlook — nothing is sent until you send it.</span></div>`:''}`;
+  }
+  html+=`<h2>Everyone</h2><div class="tablewrap"><table><thead><tr><th>Name</th><th>Status</th>${days.map(d=>`<th class="num">${shortDay(d)}<br>${d.slice(8)}</th>`).join('')}<th class="num">Total</th><th>Allowances</th><th>Leave</th></tr></thead><tbody>`;
+  for(const p of w.people){
+    const counted=p.lines.filter(l=>l.status!=='Rejected');
+    const perDay=d=>counted.filter(l=>l.date===d&&!l.allow).reduce((s,l)=>s+l.hr,0);
+    const leaveDay=d=>p.leave.some(l=>l.days.some(x=>x.date===d));
+    const allow=counted.filter(l=>l.allow).map(l=>l.allow);
+    const allowTxt=[...new Set(allow)].map(a=>{const n=allow.filter(x=>x===a).length;return n>1?n+' × '+a:a;}).join(', ');
+    const fresh=w.processed.state!=='no'&&p.lines.some(l=>l.status==='Approved'&&!l.processed);
+    html+=`<tr class="person${OPEN===p.key?' open':''}" onclick="toggle('${esc(p.key).replace(/'/g,"\\'")}')">
+      <td><b>${esc(p.name)}</b>${p.type?`<div class="meta">${esc(p.type)}</div>`:''}</td>
+      <td>${pill(p.status,STATUS[p.status])}${fresh?'<span class="tag">new</span>':''}</td>
+      ${days.map(d=>{const h=perDay(d);return `<td class="num">${h?fmtHr(h):leaveDay(d)?'<span class="pill p-processed">L</span>':'<span class="dim">–</span>'}</td>`;}).join('')}
+      <td class="num"><b>${p.lines.length?fmtHr(p.total):'–'}</b></td>
+      <td>${esc(allowTxt)||'<span class="dim">–</span>'}</td>
+      <td>${p.leave.length?p.leave.map(l=>esc(l.type)+(L_OK(l)?'':' <span class="tag">'+esc(l.status)+'</span>')).join('<br>'):'<span class="dim">–</span>'}</td></tr>`;
+    if(OPEN===p.key) html+=`<tr class="detail"><td colspan="${days.length+5}">${detailHtml(p)}</td></tr>`;
+  }
+  html+='</tbody></table></div><p class="meta">Click a person to see their lines. Approved lines can be corrected until the week is marked processed.</p>';
+  document.getElementById('weekBody').innerHTML=html;
+}
+const L_OK=l=>l.status==='Approved'||l.status==='Acknowledged';
+function reasonOf(p){ const r=p.lines.find(l=>l.status==='Rejected'&&l.rejection); return r?'“'+r.rejection+'”':''; }
+function chaseLink(emails,p){
+  const wk=weekLabel(WEEK.weekStart,WEEK.weekEnd);
+  const subj=`Timesheet for ${WEEK.site}, ${wk}`;
+  const msg=p&&p.status==='sentback'?`Hi ${p.name.split(' ')[0]},\n\nYour timesheet for ${wk} was sent back${reasonOf(p)?' ('+reasonOf(p)+')':''}. Please fix it and save it again so it can be approved for pay.\n\nThanks`
+    :p&&(p.status==='waiting'||p.status==='senior')?`Hi,\n\nThe timesheet for ${p.name}, ${wk}, is still waiting for approval. Please approve it so it can be paid.\n\nThanks`
+    :`Hi${p?' '+p.name.split(' ')[0]:''},\n\nWe don't have a timesheet from you for ${wk} yet. Please put it in today so it can be paid.\n\nThanks`;
+  const to=p?emails.join(';'):'';
+  const bcc=p?'':'&bcc='+encodeURIComponent(emails.join(';'));
+  return `mailto:${to}?subject=${encodeURIComponent(subj)}${bcc}&body=${encodeURIComponent(msg)}`;
+}
+
+/* ---------- a person's lines, with corrections ---------- */
+function toggle(key){
+  if(OPEN===key){ if(dirty()&&!confirm('Discard your unsaved changes?')) return; OPEN=null; EDIT=null; }
+  else{ if(dirty()&&!confirm('Discard your unsaved changes?')) return; OPEN=key; EDIT={edits:{},removed:new Set(),added:[]}; }
+  renderWeek();
+}
+function dirty(){ return !!EDIT&&(Object.keys(EDIT.edits).length||EDIT.removed.size||EDIT.added.length); }
+function canEdit(l){ return l.status==='Approved'&&!l.processed; }
+function detailHtml(p){
+  const days=weekDays();
+  const statusOf=l=>l.status==='Approved'?(l.processed?pill('processed','Processed'):WEEK.processed.state!=='no'?pill('approved','Approved')+'<span class="tag">new</span>':pill('approved','Approved'))
+    :l.status==='Rejected'?pill('sentback','Sent back'):pill('waiting',l.held?'Waiting for senior':'Waiting');
+  let h=`<div class="tablewrap"><table class="lines"><thead><tr><th>Day</th><th>Work order / allowance</th><th class="num">Hours</th><th>Comment</th><th>Status</th><th></th></tr></thead><tbody>`;
+  if(!p.lines.length) h+=`<tr><td colspan="6" class="meta">No timesheet lines this week.</td></tr>`;
+  for(const l of p.lines){
+    const e=EDIT.edits[l.id]||{}, gone=EDIT.removed.has(l.id), ed=canEdit(l)&&!gone;
+    const jobs=l.jobs&&l.jobs.length?` <span class="tag">${esc(l.jobs.join(', '))}</span>`:'';
+    h+=`<tr class="${gone?'removed':''}"><td>${dayLabel(l.date)}</td>
+      <td>${l.allow?esc(l.allow)+' <span class="meta">(allowance)</span>':ed?`<input class="wo" value="${esc(e.wo!=null?e.wo:l.wo)}" oninput="setEdit('${l.id}','wo',this.value)">`:esc(l.wo)||'<span class="dim">–</span>'}${jobs}</td>
+      <td class="num">${l.allow?'':ed?`<input class="hr" type="number" step="0.25" min="0" max="24" value="${e.hr!=null?e.hr:l.hr}" oninput="setEdit('${l.id}','hr',this.value)">`:fmtHr(l.hr)}</td>
+      <td>${ed?`<input class="wo" value="${esc(e.comment!=null?e.comment:l.comment)}" oninput="setEdit('${l.id}','comment',this.value)">`:esc(l.comment)}</td>
+      <td>${statusOf(l)}${l.approvedBy?`<div class="meta">${esc(l.approvedBy.replace(/\s*<[^>]*>/,''))}</div>`:''}</td>
+      <td class="num">${canEdit(l)?`<button class="btn small" onclick="event.stopPropagation();toggleRemove('${l.id}')">${gone?'Undo':'Remove'}</button>`:''}</td></tr>`;
+  }
+  EDIT.added.forEach((a,i)=>{
+    h+=`<tr><td>${dayLabel(a.date)}</td><td>${a.kind==='allowance'?esc(a.allow)+' <span class="meta">(allowance)</span>':esc(a.wo)}</td><td class="num">${a.kind==='allowance'?'':fmtHr(a.hr)}</td><td></td><td>${pill('processed','To be added')}</td>
+      <td class="num"><button class="btn small" onclick="event.stopPropagation();EDIT.added.splice(${i},1);renderWeek()">Remove</button></td></tr>`;
+  });
+  h+='</tbody></table></div>';
+  for(const l of p.leave) h+=`<div class="meta" style="margin-top:8px">Leave: <b>${esc(l.type)}</b>${l.code?' ('+esc(l.code)+')':''} — ${l.days.map(d=>dayLabel(d.date)+(d.hours?' '+fmtHr(d.hours)+' h':'')).join(', ')} ${L_OK(l)?'':'<span class="tag">'+esc(l.status)+'</span>'}</div>`;
+  const editable=p.lines.some(canEdit);
+  if(editable){
+    const opts=days.map(d=>`<option value="${d}">${dayLabel(d)}</option>`).join('');
+    h+=`<div class="addrow" onclick="event.stopPropagation()">
+        <b style="font-size:13px">Add</b>
+        <select id="addDay">${opts}</select>
+        <input id="addWo" placeholder="Work order" style="width:170px">
+        <input id="addHr" type="number" step="0.25" min="0" max="24" placeholder="Hours" style="width:80px">
+        <button class="btn small" onclick="addLine('${esc(p.key).replace(/'/g,"\\'")}','hours')">Add hours</button>
+        <span class="meta">or</span>
+        <input id="addAllow" list="allowList" placeholder="Allowance" style="width:190px">
+        <datalist id="allowList">${(WEEK.allowances||[]).map(a=>`<option value="${esc(a)}">`).join('')}</datalist>
+        <button class="btn small" onclick="addLine('${esc(p.key).replace(/'/g,"\\'")}','allowance')">Add allowance</button>
+      </div>
+      <div class="addrow" onclick="event.stopPropagation()">
+        <input id="editNote" placeholder="Reason for the change (saved with it)" style="flex:1;min-width:220px" value="${esc(EDIT.note||'')}" oninput="EDIT.note=this.value">
+        <button class="btn primary" onclick="saveEdits('${esc(p.key).replace(/'/g,"\\'")}')"${dirty()?'':' disabled'}>Save changes</button>
+        ${dirty()?`<button class="btn" onclick="EDIT={edits:{},removed:new Set(),added:[]};renderWeek()">Cancel</button>`:''}
+      </div>`;
+  }else if(p.lines.length&&WEEK.processed.state==='yes') h+='<div class="meta" style="margin-top:8px">This week is processed. Reopen it to make changes.</div>';
+  else if(p.lines.length) h+='<div class="meta" style="margin-top:8px">Only approved lines can be changed here. Waiting or sent-back lines are for the supervisor and the worker.</div>';
+  if(p.log.length) h+=`<div class="log"><b>Payroll changes</b>${p.log.map(x=>`<div>${esc(x)}</div>`).join('')}</div>`;
+  return h;
+}
+function setEdit(id,k,v){
+  const l=WEEK.people.flatMap(p=>p.lines).find(x=>x.id===id); if(!l) return;
+  const e=EDIT.edits[id]=EDIT.edits[id]||{};
+  if(String(v)===String(l[k==='hr'?'hr':k])) delete e[k]; else e[k]=v;
+  if(!Object.keys(e).length) delete EDIT.edits[id];
+  const b=document.querySelector('tr.detail .btn.primary'); if(b) b.disabled=!dirty();
+}
+function toggleRemove(id){ EDIT.removed.has(id)?EDIT.removed.delete(id):EDIT.removed.add(id); renderWeek(); }
+function addLine(key,kind){
+  const date=document.getElementById('addDay').value;
+  if(kind==='allowance'){
+    const allow=document.getElementById('addAllow').value.trim();
+    if(!allow){ toast('Choose the allowance first'); return; }
+    EDIT.added.push({person:key,kind,date,allow});
+  }else{
+    const hr=parseFloat(document.getElementById('addHr').value);
+    if(!(hr>0&&hr<=24)){ toast('Enter hours between 0 and 24'); return; }
+    EDIT.added.push({person:key,kind,date,hr,wo:document.getElementById('addWo').value.trim()});
+  }
+  renderWeek();
+}
+async function saveEdits(key){
+  if(!dirty()) return;
+  const note=EDIT.note||'';
+  const b=document.querySelector('tr.detail .btn.primary'); if(b){ b.disabled=true; b.textContent='Saving…'; }
+  try{
+    const r=await api({action:'edit',site:WEEK.site,weekStart:WEEK.weekStart,edits:EDIT.edits,removedIds:[...EDIT.removed],added:EDIT.added,note});
+    toast(`Saved — ${[r.changed&&r.changed+' changed',r.removed&&r.removed+' removed',r.added&&r.added+' added'].filter(Boolean).join(', ')||'no changes'}`);
+    const open=OPEN; await loadWeek(WEEK.site,WEEK.weekStart); OPEN=open; EDIT={edits:{},removed:new Set(),added:[]}; renderWeek();
+  }catch(e){ toast(e.message); if(b){ b.disabled=false; b.textContent='Save changes'; } }
+}
+
+/* ---------- processed / downloads ---------- */
+async function markProcessed(){
+  if(!WEEK) return;
+  const reopen=WEEK.processed.state==='yes';
+  const out=WEEK.people.filter(p=>p.status!=='approved').length;
+  const msg=reopen?'Reopen this week? Approved lines can be changed again, and it will need marking processed again.'
+    :(out?`${out} ${out===1?'person is':'people are'} still outstanding. Mark the approved lines processed anyway? `:'Mark this week processed? ')+'Approved lines are locked from payroll changes until it’s reopened.';
+  if(!confirm(msg)) return;
+  const b=document.getElementById('procBtn'); b.disabled=true;
+  try{
+    const r=await api({action:reopen?'reopen':'process',site:WEEK.site,weekStart:WEEK.weekStart});
+    toast(reopen?`Reopened (${r.updated} lines)`:`Marked processed (${r.updated} lines)`);
+    await loadWeek(WEEK.site,WEEK.weekStart);
+  }catch(e){ toast(e.message); }
+  b.disabled=false;
+}
+async function download(format){
+  if(!WEEK) return;
+  toast('Preparing the '+(format==='pdf'?'PDF':'spreadsheet')+'…');
+  try{
+    const r=await api({action:'export',site:WEEK.site,weekStart:WEEK.weekStart,format});
+    const bin=atob(r.data), bytes=new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
+    const url=URL.createObjectURL(new Blob([bytes],{type:r.mime}));
+    const a=document.createElement('a'); a.href=url; a.download=r.file; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),5000);
+  }catch(e){ toast(e.message); }
+}
+window.addEventListener('beforeunload',e=>{ if(dirty()){ e.preventDefault(); e.returnValue=''; } });
+</script>
+</body>
+</html>

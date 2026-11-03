@@ -38,6 +38,12 @@ resolved. You don't need it unless the People Picker matching misses someone.
 > supervisor and check you see your sites). If anyone's sites don't show, add the
 > `ManagerEmail` column with their email as the fallback.
 
+## Payroll page
+
+**/payroll** (`payroll.html`) is for payroll staff: every site's pay week, who's outstanding,
+corrections to approved lines, Excel/PDF downloads and Mark processed. Setup and SharePoint
+embedding: **PAYROLL.md**.
+
 ## Work-order editors (no approval rights)
 
 To let someone set up work orders (jobs) for a site without being able to approve

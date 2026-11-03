@@ -16,6 +16,17 @@
 [functions."payroll-reminder"]
   schedule = "0 20,21 * * *"
 
+# Payroll page: au-approvals.ael.co/payroll
+[[redirects]]
+  from = "/payroll"
+  to = "/payroll.html"
+  status = 200
+
+[[headers]]
+  for = "/payroll.html"
+  [headers.values]
+    Cache-Control = "no-cache"
+
 [[headers]]
   for = "/"
   [headers.values]

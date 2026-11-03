@@ -191,6 +191,9 @@ function fmtHr(n){const v=Math.round((Number(n)||0)*100)/100;return (Number.isIn
 
 /* ---------- Microsoft sign-in ---------- */
 (async function init(){
+  // The payroll page signs in with a pop-up when it's shown inside SharePoint, and Microsoft
+  // sends that pop-up back here. Leave it alone so the payroll page can read the reply.
+  if(window.opener && window.opener!==window && /^msal\./.test(window.name||'')) return;
   const cfg=window.SUP_CONFIG||{};
   if(!cfg.clientId || cfg.clientId.indexOf('PASTE')===0){ document.getElementById('signErr').textContent='Sign-in not configured yet (clientId missing in config.js).'; return; }
   try{
@@ -698,7 +701,7 @@ function tickCountdown(){
 setInterval(tickCountdown,30000);
 
 /* Version badge (shown on every screen) + always-check-for-updates on load */
-const APP_VERSION='1.5';
+const APP_VERSION='1.6';
 document.getElementById('verbadge').textContent='v'+APP_VERSION;
 document.getElementById('signinVer').textContent='Version '+APP_VERSION;
 

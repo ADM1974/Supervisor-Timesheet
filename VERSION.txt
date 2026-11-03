@@ -1,5 +1,11 @@
 Timesheet Approvals (Supervisor app) — VERSION 4.0  (2026-10-15)
 
+v1.6 (2026-11-04): new PAYROLL page at /payroll (payroll.html + netlify/functions/payroll.js)
+for payroll staff — every site's pay week at a glance, outstanding people with ready-made
+chase emails, corrections to approved lines (stamped on Notes), Excel/PDF downloads with
+leave, and Mark processed / Reopen. Access: Settings row PayrollAdmins. Works embedded in
+a SharePoint page (pop-up sign-in). See PAYROLL.md.
+
 v4.0: supervisors can SET UP CONTRACTORS from the app ("Manage contractors &
 codes"). Add a contractor by name and the app auto-generates a unique access
 code (unambiguous alphabet, no 0/O/1/I/L) for the green contractor app; you can

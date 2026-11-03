@@ -65,6 +65,14 @@ async function makeXlsx(rep) {
   }
   ws.addRow(['GRAND TOTAL', '', '', rep.grandTotal, jobSummary(rep.jobCounts), '', '']).font = { bold: true, size: 12 };
   ws.columns.forEach((c, i) => { c.width = i === 0 ? 24 : (i === 2 ? 26 : 16); });
+  if (rep.leave && rep.leave.length) {                     // payroll page: approved leave in the week
+    const lv = wb.addWorksheet('Leave');
+    lv.addRow([`Leave — ${rep.site}, ${rep.weekStart} to ${rep.weekEnd}`]).font = { bold: true, size: 14 };
+    lv.addRow([]);
+    lv.addRow(['Worker', 'Date', 'Leave type', 'Payroll code', 'Hours']).font = { bold: true };
+    for (const l of rep.leave) lv.addRow([l.name, l.date, l.type, l.code, l.hours]);
+    lv.columns.forEach((c, i) => { c.width = i === 0 ? 24 : (i === 2 ? 26 : 14); });
+  }
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 
@@ -91,6 +99,11 @@ async function makePdf(rep) {
   }
   y -= 6;
   put(`GRAND TOTAL: ${rep.grandTotal} h${jobSummary(rep.jobCounts) ? '  ·  ' + jobSummary(rep.jobCounts) : ''}`, bold, 13);
+  if (rep.leave && rep.leave.length) {
+    y -= 10;
+    put('Leave', bold, 12);
+    for (const l of rep.leave) put(`${l.name}    ${l.date}    ${l.type}${l.code ? ' (' + l.code + ')' : ''}    ${l.hours} h`, font, 10, 14);
+  }
   return Buffer.from(await doc.save());
 }
 
