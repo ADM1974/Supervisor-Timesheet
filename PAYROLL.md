@@ -32,7 +32,7 @@
 
   Processed lines and people turn grey, and each line shows who processed it and when. To change a processed line, untick it, or click **✓ Processed** on the person to undo theirs. The filter chips (**To process**, **Processed**, **Outstanding**) and the name search narrow the list. Lines approved later arrive unticked, so they show up under **To process**. Processing is saved on each line's Notes ("Processed for payroll by … on …").
 
-- **Look up any employee (Employees tab).** Search for anyone on the Workers or Contractors lists, including inactive people. Then pick a period:
+- **Look up any employee (Employees tab).** Search for anyone on the Workers or Contractors lists, including inactive people. The **site** drop-down narrows the search to people whose home site it is. With a site picked and nobody searched for yet, everyone at that site is shown as cards to click. The page remembers your site for next time. Then pick a period:
   - the last 4 or 12 weeks, 6 months or 12 months;
   - **One pay week**: any date, and you get the pay week it falls in;
   - **Between dates**, up to a year.

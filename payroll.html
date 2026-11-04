@@ -223,6 +223,9 @@
   <!-- one employee's timesheets, past or present -->
   <div id="emp" class="hidden">
     <div class="head noprint">
+      <select id="empSite" onchange="siteFilterChanged()" title="Only show people at this site">
+        <option value="">All sites</option>
+      </select>
       <div class="finder">
         <input id="empSearch" placeholder="Search for an employee or contractor" autocomplete="off"
           oninput="suggest(this.value)" onfocus="suggest(this.value)" onkeydown="suggestKey(event)">
@@ -248,7 +251,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.27.0/lib/msal-browser.min.js"></script>
 <script src="config.js"></script>
 <script>
-const APP_VERSION='1.2';
+const APP_VERSION='1.3';
 const SCOPES=['openid','profile','email'];
 const IN_FRAME=(()=>{ try{ return window.self!==window.top; }catch(_){ return true; } })();
 let msalInstance=null, account=null, ME=null, WEEK=null, OPEN=new Set(), EDIT=null, FILTER='all', QUERY='', BUSY=false;
@@ -609,9 +612,15 @@ function empHash(){
 }
 async function showEmp(q){
   showView('emp'); WEEK=null;
-  if(!PEOPLE){ try{ PEOPLE=(await api({action:'people'})).people; }catch(e){ toast(e.message); PEOPLE=[]; } }
+  if(!PEOPLE){
+    try{ PEOPLE=(await api({action:'people'})).people; }catch(e){ toast(e.message); PEOPLE=[]; }
+    fillSiteFilter();
+    let saved=''; try{ saved=localStorage.getItem('payroll.empSite')||''; }catch(_){}
+    if(q&&q.get('site')) saved=q.get('site');
+    if(saved&&[...document.getElementById('empSite').options].some(o=>o.value===saved)) document.getElementById('empSite').value=saved;
+  }
   const name=q&&q.get('emp');
-  if(!name) return;
+  if(!name){ if(!PERSON) renderRoster(); return; }
   if(q.get('range')) document.getElementById('empRange').value=q.get('range');
   if(q.get('date')) document.getElementById('empDate').value=q.get('date');
   if(q.get('from')) document.getElementById('empFrom').value=q.get('from');
@@ -621,10 +630,42 @@ async function showEmp(q){
   document.getElementById('empSearch').value=PERSON.name;
   loadEmp(true);
 }
+function atSite(p,site){ return !site||String(p.site||'').split(/[;,]/).map(x=>x.trim().toLowerCase()).includes(site.toLowerCase()); }
+function siteFilter(){ return document.getElementById('empSite').value; }
+function fillSiteFilter(){
+  const sel=document.getElementById('empSite'), keep=sel.value;
+  const names=[...new Set([...(ME.sites||[]).map(x=>x.name),...(PEOPLE||[]).flatMap(p=>String(p.site||'').split(/[;,]/).map(x=>x.trim()))].filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  sel.innerHTML='<option value="">All sites</option>'+names.map(n=>`<option${n===keep?' selected':''}>${esc(n)}</option>`).join('');
+}
+function siteFilterChanged(){
+  const site=siteFilter();
+  try{ localStorage.setItem('payroll.empSite',site); }catch(_){}
+  if(!PERSON||!atSite(PERSON,site)){ PERSON=null; EMP=null; document.getElementById('empSearch').value=''; renderRoster(); }
+  if(PERSON) return;
+  document.getElementById('empSearch').focus();
+}
+// with no one picked yet: everyone at the chosen site, to click on
+function renderRoster(){
+  const site=siteFilter(), list=(PEOPLE||[]).filter(p=>atSite(p,site));
+  const body=document.getElementById('empBody');
+  if(!site){ body.innerHTML='<div class="card empty">Search for someone, or pick a site to see everyone there.</div>'; return; }
+  if(!list.length){ body.innerHTML=`<div class="card empty">Nobody has ${esc(site)} as their home site.</div>`; return; }
+  const act=list.filter(p=>p.active!==false), old=list.filter(p=>p.active===false);
+  const card=p=>`<button class="card sitecard" style="text-align:left;display:flex;gap:10px;align-items:center;padding:12px 14px;font:inherit" onclick="pickFromRoster(${js(p.name)},${js(p.id||'')})">
+      <span class="av">${esc(initials(p.name))}</span><span style="min-width:0"><b style="display:block">${esc(p.name)}</b><span class="meta">${esc(p.type)}${p.active===false?' · inactive':''}</span></span></button>`;
+  body.innerHTML=`<h2 style="margin-top:0">${esc(site)} <span class="meta">(${act.length} people)</span></h2>
+    <div class="grid" style="margin-top:0">${act.map(card).join('')}</div>
+    ${old.length?`<h2>Inactive <span class="meta">(${old.length})</span></h2><div class="grid" style="margin-top:0">${old.map(card).join('')}</div>`:''}`;
+}
+function pickFromRoster(name,id){
+  PERSON=(PEOPLE||[]).find(p=>p.name===name&&(p.id||'')===id)||{name,id,email:''};
+  document.getElementById('empSearch').value=PERSON.name;
+  EMP_OPEN=new Set(); loadEmp();
+}
 function suggest(v){
-  const box=document.getElementById('sugg'), t=String(v||'').trim().toLowerCase();
-  SUGG=(PEOPLE||[]).filter(p=>!t||p.name.toLowerCase().includes(t)).slice(0,40); SUGGI=-1;
-  if(!SUGG.length){ box.innerHTML=t?'<div class="meta" style="padding:10px 12px">Nobody by that name</div>':''; box.classList.toggle('hidden',!t); return; }
+  const box=document.getElementById('sugg'), t=String(v||'').trim().toLowerCase(), site=siteFilter();
+  SUGG=(PEOPLE||[]).filter(p=>atSite(p,site)&&(!t||p.name.toLowerCase().includes(t))).slice(0,60); SUGGI=-1;
+  if(!SUGG.length){ box.innerHTML=t||site?`<div class="meta" style="padding:10px 12px">Nobody${t?' by that name':''}${site?' at '+esc(site):''}</div>`:''; box.classList.toggle('hidden',!(t||site)); return; }
   box.innerHTML=SUGG.map((p,i)=>`<button onmousedown="event.preventDefault();pickPerson(${i})"><span class="av" style="width:28px;height:28px;font-size:11px">${esc(initials(p.name))}</span>
     <span><b>${esc(p.name)}</b>${p.active?'':' <span class="tag">inactive</span>'}</span><span class="meta">${esc(p.type)}${p.site?' · '+esc(p.site):''}</span></button>`).join('');
   box.classList.remove('hidden');
