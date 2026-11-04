@@ -202,6 +202,7 @@ function shapeWeek(site, ws, we, rows, expected, leave) {
     site, weekStart: ws, weekEnd: we, people: list,
     summary: {
       people: list.length, approved: count('approved'), waiting: count('waiting') + count('senior'),
+      lines: ap.length, processedLines: stamped.length,
       sentback: count('sentback'), missing: count('missing'),
       approvedHours: r2(list.reduce((s, p) => s + p.approvedTotal, 0)),
       leaveHours: r2(list.reduce((s, p) => s + p.leaveHours, 0)),
@@ -298,20 +299,26 @@ exports.handler = async (event) => {
       return reply(200, { ok: true, file, mime: pdf ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', data: buf.toString('base64') });
     }
 
-    // ---- mark processed / reopen ----
+    // ---- mark processed / reopen: the whole week, one person (person = key), or some lines (ids) ----
     if (action === 'process' || action === 'reopen') {
       const { rows } = await loadWeek(token, site, ws);
-      const ap = rows.filter(it => (it.fields || {}).Status === 'Approved');
-      let n = 0;
-      for (const it of ap) {
-        const notes = String((it.fields || {}).Notes || '');
-        const stamped = PROC_RE.test(notes);
-        if (action === 'process' && !stamped) { await S.updateItem(token, it.id, { Notes: appendNote(notes, `Processed for payroll by ${who} on ${when}`) }); n++; }
-        if (action === 'reopen' && stamped) {
-          await S.updateItem(token, it.id, { Notes: appendNote(notes.replace(PROC_STRIP, '').replace(/^\s*·\s*/, '').trim(), `Payroll reopened by ${who} on ${when}`) }); n++;
-        }
+      const ids = Array.isArray(data.ids) ? new Set(data.ids.map(String)) : null;
+      const person = data.person != null ? String(data.person) : null;
+      const ap = rows.filter(it => (it.fields || {}).Status === 'Approved'
+        && (!ids || ids.has(String(it.id))) && (person == null || personKeyOf(it.fields || {}) === person));
+      const todo = ap.filter(it => PROC_RE.test(String((it.fields || {}).Notes || '')) === (action === 'reopen'));
+      const done = [];
+      for (let i = 0; i < todo.length; i += 5) {          // a few at a time: quicker, and gentle on SharePoint
+        await Promise.all(todo.slice(i, i + 5).map(async it => {
+          const notes = String((it.fields || {}).Notes || '');
+          const next = action === 'process'
+            ? appendNote(notes, `Processed for payroll by ${who} on ${when}`)
+            : appendNote(notes.replace(PROC_STRIP, '').replace(/^\s*·\s*/, '').trim(), `Payroll reopened by ${who} on ${when}`);
+          await S.updateItem(token, it.id, { Notes: next });
+          done.push(String(it.id));
+        }));
       }
-      return reply(200, { ok: true, updated: n });
+      return reply(200, { ok: true, updated: done.length, ids: done, by: who, when });
     }
 
     // ---- payroll corrections to approved lines ----

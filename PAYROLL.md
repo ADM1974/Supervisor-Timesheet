@@ -25,9 +25,12 @@
 
   Write a reason, then **Save changes**. Each change is stamped on the line's Notes as "Payroll changed … (by you on date — reason)" and listed under **Payroll changes** for that person. A removed line is noted on the person's other lines. Only approved lines can be changed here: waiting and sent-back lines stay with the supervisor and the worker.
 - **Download Excel or PDF.** These hold the week's approved hours, in the same layout as the automatic payroll email. Approved leave is included too: a **Leave** sheet in Excel, and a Leave section in the PDF.
-- **Mark processed.** This stamps every approved line "Processed for payroll by … on …".
-  - Processed lines can't be changed here until you **Reopen week**.
-  - A line approved after processing (for example, a late approval) shows as **new**. The site card shows "Processed · 2 new lines" and the button changes to **Mark new lines processed**.
+- **Process as you go.** You can process at three levels:
+  - **Each line** has a tick box: tick it when you've processed that line.
+  - **Process all** on a person processes every approved line they have that week.
+  - **Process all approved** at the top processes the whole site.
+
+  Processed lines and people turn grey, and each line shows who processed it and when. To change a processed line, untick it, or click **✓ Processed** on the person to undo theirs. The filter chips (**To process**, **Processed**, **Outstanding**) and the name search narrow the list. Lines approved later arrive unticked, so they show up under **To process**. Processing is saved on each line's Notes ("Processed for payroll by … on …").
 
 ## Setup
 

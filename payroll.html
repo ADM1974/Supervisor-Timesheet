@@ -8,73 +8,119 @@
 <title>Timesheet Payroll</title>
 <style>
   :root{
-    --brand:#2958cc;--brand-dark:#1d3f96;--bg:#f3f5fa;--card:#ffffff;--ink:#1f2329;--muted:#6a7280;--line:#e2e6ee;
-    --amber:#8a4b00;--amber-bg:#fdf0dc;--green:#0f6b39;--green-bg:#e3f4ea;--red:#a3241d;--red-bg:#fbe7e5;--blue-bg:#e8eefb;
+    --brand:#2958cc;--brand-dark:#1d3f96;--brand-soft:#e8eefb;--bg:#f2f4f8;--card:#ffffff;--ink:#1c2230;--muted:#667085;--line:#e3e7ef;
+    --amber:#8a4b00;--amber-bg:#fdf0dc;--green:#0f6b39;--green-bg:#e3f4ea;--red:#a3241d;--red-bg:#fbe7e5;
+    --done:#f1f2f5;--done-ink:#8b93a3;
   }
   *{box-sizing:border-box;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;}
   html,body{margin:0;}
-  body{background:var(--bg);color:var(--ink);min-height:100vh;}
+  body{background:var(--bg);color:var(--ink);min-height:100vh;font-size:14px;}
   .hidden{display:none !important;}
-  .appbar{background:var(--brand);color:#fff;padding:12px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:20;}
+  .appbar{background:var(--brand);color:#fff;padding:12px 22px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:20;}
   .appbar img{height:15px;display:block;}
   .appbar .ttl{font-size:15px;font-weight:600;flex:1;padding-left:12px;border-left:1px solid rgba(255,255,255,.4);}
-  .appbar .user{font-size:12px;background:rgba(255,255,255,.2);padding:5px 11px;border-radius:20px;cursor:pointer;border:0;color:#fff;}
-  .wrap{max-width:1180px;margin:0 auto;padding:18px 20px 60px;}
-  h1{font-size:20px;font-weight:600;margin:4px 0 4px;}
-  h2{font-size:15px;font-weight:600;margin:22px 0 10px;}
+  .appbar .user{font-size:12px;background:rgba(255,255,255,.18);padding:6px 12px;border-radius:20px;cursor:pointer;border:0;color:#fff;}
+  .appbar .user:hover{background:rgba(255,255,255,.28);}
+  .wrap{max-width:1200px;margin:0 auto;padding:22px 22px 70px;}
+  h1{font-size:22px;font-weight:600;margin:0;}
+  h2{font-size:15px;font-weight:600;margin:26px 0 10px;}
   .meta{color:var(--muted);font-size:13px;line-height:1.5;}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;}
-  .btn{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:8px;padding:8px 13px;font-size:13.5px;font-weight:600;cursor:pointer;white-space:nowrap;}
-  .btn:hover{border-color:#c5cbd8;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;}
+  .btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:8px;padding:8px 14px;font-size:13.5px;font-weight:600;cursor:pointer;white-space:nowrap;text-decoration:none;}
+  .btn:hover{border-color:#c3cad8;background:#fafbfd;}
   .btn.primary{background:var(--brand);border-color:var(--brand);color:#fff;}
   .btn.primary:hover{background:var(--brand-dark);}
-  .btn.small{padding:5px 9px;font-size:12.5px;}
-  .btn.link{border:0;background:none;color:var(--brand);padding:4px 6px;}
+  .btn.done{background:var(--green-bg);border-color:#bfe3cc;color:var(--green);}
+  .btn.small{padding:5px 10px;font-size:12.5px;border-radius:7px;}
+  .btn.link{border:0;background:none;color:var(--brand);padding:4px 2px;}
   .btn:disabled{opacity:.5;cursor:default;}
-  select,input,textarea{font:inherit;font-size:13.5px;border:1px solid var(--line);border-radius:8px;padding:7px 9px;background:#fff;color:var(--ink);}
-  .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0 4px;}
-  .toolbar .grow{flex:1;}
-  .pill{display:inline-block;font-size:11.5px;font-weight:700;border-radius:20px;padding:3px 9px;white-space:nowrap;}
+  select,input,textarea{font:inherit;font-size:13.5px;border:1px solid var(--line);border-radius:8px;padding:7px 10px;background:#fff;color:var(--ink);}
+  input:focus,select:focus{outline:2px solid #bcd0f6;border-color:var(--brand);}
+  .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+  .grow{flex:1;}
+  .pill{display:inline-block;font-size:11.5px;font-weight:700;border-radius:20px;padding:3px 10px;white-space:nowrap;}
   .p-approved{background:var(--green-bg);color:var(--green);}
   .p-waiting,.p-senior{background:var(--amber-bg);color:var(--amber);}
   .p-sentback,.p-missing{background:var(--red-bg);color:var(--red);}
-  .p-processed{background:var(--blue-bg);color:var(--brand-dark);}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;}
-  .sitecard{cursor:pointer;}
-  .sitecard:hover{border-color:#b9c4dc;}
-  .sitecard .nm{font-size:16px;font-weight:700;}
-  .sitecard .row{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
-  .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:14px 0;}
-  .metric{background:#fff;border:1px solid var(--line);border-radius:10px;padding:11px 14px;}
-  .metric .l{font-size:12px;color:var(--muted);}
-  .metric .v{font-size:22px;font-weight:600;margin-top:2px;}
-  .banner{border-radius:10px;padding:10px 14px;font-size:13.5px;margin:10px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
-  .banner.ok{background:var(--blue-bg);color:var(--brand-dark);}
+  .p-info{background:var(--brand-soft);color:var(--brand-dark);}
+  .p-done{background:var(--done);color:#5d6575;}
+  .bar{height:7px;background:#e7eaf0;border-radius:6px;overflow:hidden;}
+  .bar>i{display:block;height:100%;background:var(--green);border-radius:6px;transition:width .25s;}
+  /* home */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px;margin-top:16px;}
+  .sitecard{cursor:pointer;transition:border-color .15s,box-shadow .15s;}
+  .sitecard:hover{border-color:#b6c3df;box-shadow:0 2px 10px rgba(30,50,100,.07);}
+  .sitecard .nm{font-size:17px;font-weight:700;}
+  .sitecard .big{display:flex;gap:22px;margin:14px 0 12px;}
+  .sitecard .big b{display:block;font-size:20px;font-weight:600;}
+  /* week */
+  .head{display:flex;flex-wrap:wrap;gap:12px;align-items:center;}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:16px 0 4px;}
+  .tile{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 16px;}
+  .tile .l{font-size:12px;color:var(--muted);}
+  .tile .v{font-size:23px;font-weight:600;margin:3px 0 0;}
+  .tile .bar{margin-top:9px;}
+  .banner{border-radius:10px;padding:10px 14px;font-size:13.5px;margin:12px 0 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  .banner.ok{background:var(--green-bg);color:var(--green);}
   .banner.warn{background:var(--amber-bg);color:var(--amber);}
-  table{width:100%;border-collapse:collapse;background:#fff;}
-  .tablewrap{border:1px solid var(--line);border-radius:10px;overflow-x:auto;background:#fff;}
-  th,td{padding:8px 10px;font-size:13px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top;}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;}
+  .chip{border:1px solid var(--line);background:#fff;border-radius:20px;padding:6px 13px;font-size:13px;font-weight:600;cursor:pointer;color:var(--ink);}
+  .chip.on{background:var(--brand);border-color:var(--brand);color:#fff;}
+  .chip .n{opacity:.7;margin-left:4px;font-weight:500;}
+  .search{width:220px;}
+  /* outstanding */
+  .tablewrap{border:1px solid var(--line);border-radius:12px;overflow-x:auto;background:#fff;}
+  table{width:100%;border-collapse:collapse;}
+  th,td{padding:9px 12px;font-size:13px;text-align:left;border-bottom:1px solid var(--line);vertical-align:middle;}
+  tr:last-child>td{border-bottom:0;}
   th{font-size:11.5px;color:var(--muted);font-weight:700;background:#fafbfd;white-space:nowrap;}
   td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
-  tr.person{cursor:pointer;}
-  tr.person:hover td{background:#f8faff;}
-  tr.person.open td{background:#f3f6fd;}
-  tr.detail>td{background:#fbfcfe;padding:12px 14px 16px;}
-  .dim{color:#a3a9b5;}
-  .lines td{font-size:12.5px;background:#fff;}
-  .lines input{padding:5px 7px;font-size:12.5px;}
-  .lines .hr{width:70px;text-align:right;}
-  .lines .wo{width:100%;min-width:140px;}
-  .removed td{text-decoration:line-through;color:#a3a9b5;}
-  .addrow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:10px;}
-  .log{font-size:12px;color:var(--muted);margin-top:10px;}
+  /* people */
+  .person{background:#fff;border:1px solid var(--line);border-radius:12px;margin-bottom:10px;overflow:hidden;transition:background .2s;}
+  .person .top{display:grid;grid-template-columns:minmax(190px,1.4fr) auto minmax(250px,2fr) 70px 150px;gap:14px;align-items:center;padding:12px 16px;cursor:pointer;}
+  .person .top:hover{background:#f8faff;}
+  .person.open .top{background:#f4f7fd;border-bottom:1px solid var(--line);}
+  .av{width:34px;height:34px;border-radius:50%;background:var(--brand-soft);color:var(--brand-dark);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12.5px;flex:0 0 auto;}
+  .who{display:flex;gap:10px;align-items:center;min-width:0;}
+  .who b{display:block;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .days{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
+  .days div{text-align:center;font-size:12px;border-radius:6px;padding:4px 0;background:#f5f7fa;font-variant-numeric:tabular-nums;}
+  .days div small{display:block;font-size:10px;color:var(--muted);}
+  .days div.lv{background:var(--brand-soft);color:var(--brand-dark);font-weight:700;}
+  .days div.zero{color:#b2b8c4;}
+  .tot{font-size:16px;font-weight:700;text-align:right;font-variant-numeric:tabular-nums;}
+  .act{text-align:right;}
+  .person.alldone{background:var(--done);}
+  .person.alldone .top{opacity:.72;}
+  .person.alldone .av{background:#dde1e8;color:#6b7383;}
+  .person.alldone .days div{background:#e7e9ee;}
+  .person .body{padding:12px 16px 16px;background:#fbfcfe;}
+  .lines td{font-size:13px;background:#fff;}
+  .lines input.hr{width:74px;text-align:right;padding:5px 7px;}
+  .lines input.tx{width:100%;min-width:130px;padding:5px 8px;}
+  .lines tr.isdone td{background:var(--done);color:var(--done-ink);}
+  .lines tr.isdone td .pill{opacity:.8;}
+  .lines tr.removed td{text-decoration:line-through;color:#a3a9b5;}
+  .lines tr.adding td{background:#f4f8ff;}
+  .tick{width:18px;height:18px;cursor:pointer;accent-color:var(--green);}
+  .by{font-size:11.5px;color:var(--done-ink);}
+  .tag{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;border-radius:10px;padding:1px 7px;background:var(--amber-bg);color:var(--amber);margin-left:5px;}
+  .editbar{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-top:12px;padding:10px 12px;border:1px dashed #cfd6e4;border-radius:10px;background:#fff;}
+  .editbar b{font-size:13px;}
+  .log{font-size:12px;color:var(--muted);margin-top:12px;}
   .log div{padding:2px 0;}
-  .tag{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;border-radius:10px;padding:1px 7px;background:var(--amber-bg);color:var(--amber);margin-left:4px;}
-  .gate{max-width:420px;margin:70px auto;text-align:center;}
+  .gate{max-width:420px;margin:80px auto;text-align:center;}
   .err{color:var(--red);font-size:13px;margin-top:10px;}
-  #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:#1f2329;color:#fff;padding:10px 16px;border-radius:8px;font-size:13.5px;opacity:0;transition:.2s;pointer-events:none;z-index:50;}
+  .empty{padding:30px;text-align:center;color:var(--muted);}
+  #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:#1c2230;color:#fff;padding:10px 16px;border-radius:8px;font-size:13.5px;opacity:0;transition:.2s;pointer-events:none;z-index:50;}
   #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
-  @media (max-width:640px){ .wrap{padding:14px 12px 50px;} .appbar{padding:10px 12px;} }
+  @media (max-width:900px){
+    .person .top{grid-template-columns:1fr auto;}
+    .person .top .days{grid-column:1 / -1;order:3;}
+    .person .top .tot{order:2;}
+    .person .top .act{grid-column:1 / -1;order:4;text-align:left;}
+  }
+  @media (max-width:640px){ .wrap{padding:14px 12px 60px;} .appbar{padding:10px 12px;} .search{width:100%;} }
 </style>
 </head>
 <body>
@@ -102,37 +148,41 @@
 </div>
 
 <div class="wrap hidden" id="app">
-  <!-- home: every site's last finished pay week -->
+  <!-- home: every site's pay week -->
   <div id="home">
-    <div class="toolbar">
-      <div class="grow"><h1>Pay weeks</h1><div class="meta" id="homeSub">Each site's last finished pay week. Pick one to open it.</div></div>
+    <div class="head">
+      <div class="grow"><h1>Pay weeks</h1><div class="meta">Pick a site to check and process its week.</div></div>
       <select id="homeWeeks" onchange="loadHome()">
         <option value="1">Last finished week</option>
         <option value="0">Current week</option>
         <option value="2">2 weeks ago</option>
         <option value="3">3 weeks ago</option>
       </select>
-      <button class="btn" onclick="loadHome()">Refresh</button>
+      <button class="btn" onclick="loadHome()">↻ Refresh</button>
     </div>
     <div class="grid" id="siteCards"><div class="meta">Loading…</div></div>
   </div>
 
   <!-- one site's week -->
   <div id="week" class="hidden">
-    <div class="toolbar">
-      <button class="btn link" onclick="goHome()">← All sites</button>
+    <button class="btn link" onclick="goHome()">← All sites</button>
+    <div class="head" style="margin-top:6px">
+      <div class="grow">
+        <h1 id="weekTitle"></h1>
+        <div class="row" style="margin-top:8px">
+          <select id="siteSel" onchange="pickSite()"></select>
+          <button class="btn small" onclick="stepWeek(1)" aria-label="Earlier week">◀</button>
+          <select id="weekSel" onchange="pickWeek()"></select>
+          <button class="btn small" onclick="stepWeek(-1)" aria-label="Later week">▶</button>
+        </div>
+      </div>
+      <div class="row">
+        <button class="btn" onclick="download('xlsx')">⤓ Excel</button>
+        <button class="btn" onclick="download('pdf')">⤓ PDF</button>
+        <button class="btn primary" id="procBtn" onclick="processWeek()">Process all approved</button>
+      </div>
     </div>
-    <div class="toolbar">
-      <select id="siteSel" onchange="pickSite()"></select>
-      <button class="btn small" onclick="stepWeek(1)" aria-label="Earlier week">◀</button>
-      <select id="weekSel" onchange="pickWeek()"></select>
-      <button class="btn small" onclick="stepWeek(-1)" aria-label="Later week">▶</button>
-      <span class="grow"></span>
-      <button class="btn" onclick="download('xlsx')">Download Excel</button>
-      <button class="btn" onclick="download('pdf')">Download PDF</button>
-      <button class="btn primary" id="procBtn" onclick="markProcessed()">Mark processed</button>
-    </div>
-    <div id="weekBody"><div class="meta">Loading…</div></div>
+    <div id="weekBody"><div class="meta" style="margin-top:20px">Loading…</div></div>
   </div>
 </div>
 <div id="toast"></div>
@@ -140,20 +190,24 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.27.0/lib/msal-browser.min.js"></script>
 <script src="config.js"></script>
 <script>
-const APP_VERSION='1.0';
+const APP_VERSION='1.1';
 const SCOPES=['openid','profile','email'];
 const IN_FRAME=(()=>{ try{ return window.self!==window.top; }catch(_){ return true; } })();
-let msalInstance=null, account=null, ME=null, WEEK=null, OPEN=null, EDIT=null;
+let msalInstance=null, account=null, ME=null, WEEK=null, OPEN=new Set(), EDIT=null, FILTER='all', QUERY='', BUSY=false;
 
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),3200);}
-function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+const js=s=>esc(JSON.stringify(String(s)));   // a string literal safe inside an onclick="…"
 function fmtHr(n){const v=Math.round((Number(n)||0)*100)/100;return Number.isInteger(v)?v.toFixed(1):String(v);}
 function dayLabel(d){return new Date(d+'T00:00:00Z').toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short',timeZone:'UTC'});}
 function shortDay(d){return new Date(d+'T00:00:00Z').toLocaleDateString('en-AU',{weekday:'short',timeZone:'UTC'});}
 function weekLabel(ws,we){return dayLabel(ws)+' – '+dayLabel(we);}
 function addDays(d,n){return new Date(Date.parse(d+'T00:00:00Z')+n*86400000).toISOString().slice(0,10);}
-const STATUS={approved:'Approved',waiting:'Waiting for approval',senior:'Waiting for senior approver',sentback:'Sent back',missing:'Not submitted'};
+function initials(n){const p=String(n||'').trim().split(/\s+/);return ((p[0]||'')[0]||'').toUpperCase()+((p.length>1?p[p.length-1]:'')[0]||'').toUpperCase();}
+function whenLabel(w){ if(!w) return ''; const d=new Date(w.replace(' ','T')+':00Z'); return isNaN(d)?w:d.toLocaleString('en-AU',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}); }
+const STATUS={approved:'Approved',waiting:'Waiting for approval',senior:'Waiting for senior',sentback:'Sent back',missing:'Not submitted'};
 const pill=(cls,txt)=>`<span class="pill p-${cls}">${esc(txt)}</span>`;
+const L_OK=l=>l.status==='Approved'||l.status==='Acknowledged';
 
 /* ---------- Microsoft sign-in (a pop-up when shown inside SharePoint, which won't let sign-in load in a frame) ---------- */
 (async function init(){
@@ -245,18 +299,19 @@ async function loadHome(){
     if(!r.sites.length){ box.innerHTML='<div class="meta">No active sites.</div>'; return; }
     box.innerHTML=r.sites.map(s=>{
       const m=s.summary, out=m.waiting+m.sentback+m.missing;
-      const proc=s.processed.state==='yes'?pill('processed','Processed'+(s.processed.by?' by '+s.processed.by.split(' ')[0]:''))
-        :s.processed.state==='partial'?pill('waiting',`Processed · ${s.processed.newSince} new line${s.processed.newSince===1?'':'s'}`):'';
-      return `<div class="card sitecard" onclick="openWeek('${esc(s.site).replace(/'/g,"\\'")}','${s.weekStart}')">
-        <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><div class="nm">${esc(s.site)}</div>${proc}</div>
+      const lines=m.lines||0, done=m.processedLines||0, pct=lines?Math.round(done/lines*100):0;
+      const state=!lines?'':done===lines?pill('approved','✓ All processed'):done?pill('info',`${done} of ${lines} lines processed`):pill('done','Not processed');
+      return `<div class="card sitecard" onclick="openWeek(${js(s.site)},'${s.weekStart}')">
+        <div class="row"><div class="nm grow">${esc(s.site)}</div>${state}</div>
         <div class="meta">${weekLabel(s.weekStart,s.weekEnd)}</div>
-        <div class="metrics" style="grid-template-columns:1fr 1fr;margin:10px 0 0">
-          <div><div class="meta">Approved hours</div><div style="font-size:19px;font-weight:600">${fmtHr(m.approvedHours)}</div></div>
-          <div><div class="meta">People approved</div><div style="font-size:19px;font-weight:600">${m.approved} of ${m.people}</div></div>
+        <div class="big">
+          <div><span class="meta">Approved hours</span><b>${fmtHr(m.approvedHours)}</b></div>
+          <div><span class="meta">People approved</span><b>${m.approved} of ${m.people}</b></div>
         </div>
-        <div class="row">${out?'':pill('approved','Everyone approved')}
+        ${lines?`<div class="bar"><i style="width:${pct}%"></i></div>`:''}
+        <div class="row" style="margin-top:12px">${out?'':pill('approved','Everyone approved')}
           ${m.waiting?pill('waiting',m.waiting+' waiting'):''}${m.sentback?pill('sentback',m.sentback+' sent back'):''}${m.missing?pill('missing',m.missing+' not submitted'):''}
-          ${m.leaveHours?pill('processed',fmtHr(m.leaveHours)+' h leave'):''}</div>
+          ${m.leaveHours?pill('info',fmtHr(m.leaveHours)+' h leave'):''}</div>
       </div>`;
     }).join('');
   }catch(e){ box.innerHTML=`<div class="err">${esc(e.message)}</div>`; }
@@ -280,63 +335,103 @@ function fillWeeks(site,weekStart){
   if(weekStart&&!weeks.some(w=>w.weekStart===weekStart)) weeks.push({weekStart,weekEnd:addDays(weekStart,6)});
   document.getElementById('weekSel').innerHTML=weeks.map(w=>`<option value="${w.weekStart}"${w.weekStart===weekStart?' selected':''}>${weekLabel(w.weekStart,w.weekEnd)}${w.current?' (current)':''}</option>`).join('');
 }
-function pickSite(){ const s=document.getElementById('siteSel').value; const w=siteWeeks(s); openWeek(s,(w[1]||w[0]).weekStart); }
-function pickWeek(){ openWeek(document.getElementById('siteSel').value,document.getElementById('weekSel').value); }
+function pickSite(){ if(!leaveEdits()) return; const s=document.getElementById('siteSel').value; const w=siteWeeks(s); openWeek(s,(w[1]||w[0]).weekStart); }
+function pickWeek(){ if(!leaveEdits()) return; openWeek(document.getElementById('siteSel').value,document.getElementById('weekSel').value); }
 function stepWeek(dir){ const sel=document.getElementById('weekSel'); const i=sel.selectedIndex+dir; if(i>=0&&i<sel.options.length){ sel.selectedIndex=i; pickWeek(); } }
 
-async function loadWeek(site,weekStart){
+async function loadWeek(site,weekStart,keepOpen){
   const body=document.getElementById('weekBody');
-  body.innerHTML='<div class="meta">Loading…</div>';
-  OPEN=null; EDIT=null;
+  if(!keepOpen){ body.innerHTML='<div class="meta" style="margin-top:20px">Loading…</div>'; OPEN=new Set(); }
+  document.getElementById('weekTitle').textContent=site;
+  EDIT=null;
   try{ WEEK=await api({action:'week',site,weekStart}); renderWeek(); }
   catch(e){ body.innerHTML=`<div class="err">${esc(e.message)}</div>`; }
 }
 function weekDays(){ return Array.from({length:7},(_,i)=>addDays(WEEK.weekStart,i)); }
 
+/* processed counts, recomputed in the page after a tick so it doesn't need a reload */
+function approvedLines(p){ return p.lines.filter(l=>l.status==='Approved'); }
+function personState(p){ const ap=approvedLines(p), d=ap.filter(l=>l.processed).length; return {total:ap.length,done:d,all:ap.length>0&&d===ap.length}; }
+function weekState(){
+  let total=0,done=0;
+  for(const p of WEEK.people){ const s=personState(p); total+=s.total; done+=s.done; }
+  return {total,done};
+}
+function matches(p){
+  if(QUERY&&!p.name.toLowerCase().includes(QUERY)) return false;
+  const s=personState(p);
+  if(FILTER==='todo') return s.total>s.done;
+  if(FILTER==='done') return s.all;
+  if(FILTER==='out') return p.status!=='approved';
+  return true;
+}
+
 function renderWeek(){
-  const w=WEEK, m=w.summary, days=weekDays();
+  const w=WEEK, m=w.summary, ws=weekState();
   const out=w.people.filter(p=>p.status!=='approved');
+  const pct=ws.total?Math.round(ws.done/ws.total*100):0;
   const btn=document.getElementById('procBtn');
-  btn.textContent=w.processed.state==='yes'?'Reopen week':w.processed.state==='partial'?'Mark new lines processed':'Mark processed';
-  btn.className='btn'+(w.processed.state==='yes'?'':' primary');
-  let html='';
-  if(w.processed.state==='yes') html+=`<div class="banner ok">✓ Processed by ${esc(w.processed.by)} on ${esc(w.processed.when)} UTC. Lines are locked until the week is reopened.</div>`;
-  if(w.processed.state==='partial') html+=`<div class="banner warn">Processed by ${esc(w.processed.by)} on ${esc(w.processed.when)} UTC, but ${w.processed.newSince} line${w.processed.newSince===1?' was':'s were'} approved after that. They're marked <span class="tag">new</span> below.</div>`;
-  html+=`<div class="metrics">
-    <div class="metric"><div class="l">Approved hours</div><div class="v">${fmtHr(m.approvedHours)}</div></div>
-    <div class="metric"><div class="l">People approved</div><div class="v">${m.approved} of ${m.people}</div></div>
-    <div class="metric"><div class="l">Still outstanding</div><div class="v" style="color:${out.length?'var(--red)':'var(--green)'}">${out.length}</div></div>
-    <div class="metric"><div class="l">Leave hours</div><div class="v">${fmtHr(m.leaveHours)}</div></div>
+  btn.textContent=ws.total&&ws.done===ws.total?'↺ Reopen week':'✓ Process all approved';
+  btn.className='btn '+(ws.total&&ws.done===ws.total?'':'primary');
+  btn.disabled=!ws.total;
+  let html=`<div class="tiles">
+    <div class="tile"><div class="l">Approved hours</div><div class="v">${fmtHr(m.approvedHours)}</div></div>
+    <div class="tile"><div class="l">People approved</div><div class="v">${m.approved} <span class="meta">of ${m.people}</span></div></div>
+    <div class="tile"><div class="l">Still outstanding</div><div class="v" style="color:${out.length?'var(--red)':'var(--green)'}">${out.length}</div></div>
+    <div class="tile"><div class="l">Leave hours</div><div class="v">${fmtHr(m.leaveHours)}</div></div>
+    <div class="tile"><div class="l">Processed</div><div class="v">${ws.done} <span class="meta">of ${ws.total} lines</span></div><div class="bar"><i style="width:${pct}%"></i></div></div>
   </div>`;
+  if(ws.total&&ws.done===ws.total) html+=`<div class="banner ok">✓ Everything approved this week is processed${w.processed.by?` — last by ${esc(w.processed.by)}`:''}.</div>`;
+  else if(ws.done) html+=`<div class="banner warn">${ws.total-ws.done} approved line${ws.total-ws.done===1?' is':'s are'} still to process. Use the <b>To process</b> filter to find them.</div>`;
+
   if(out.length){
     const emails=out.map(p=>p.email).filter(Boolean);
-    html+=`<h2>Outstanding</h2><div class="tablewrap"><table><thead><tr><th>Name</th><th>Type</th><th>Status</th><th class="num">Hours so far</th><th></th></tr></thead><tbody>
-      ${out.map(p=>`<tr><td>${esc(p.name)}</td><td>${esc(p.type||'')}</td><td>${pill(p.status,STATUS[p.status])}${p.status==='sentback'?`<div class="meta">${esc(reasonOf(p))}</div>`:''}</td><td class="num">${p.lines.length?fmtHr(p.total):'<span class="dim">–</span>'}</td>
-        <td class="num">${p.email?`<a class="btn small" href="${chaseLink([p.email],p)}">Email</a>`:'<span class="meta">no email</span>'}</td></tr>`).join('')}
-      </tbody></table></div>
-      ${emails.length>1?`<div class="toolbar"><a class="btn small" href="${chaseLink(emails)}">Email all ${emails.length} outstanding</a><span class="meta">Opens a new email in Outlook — nothing is sent until you send it.</span></div>`:''}`;
+    html+=`<h2>Outstanding <span class="meta">(${out.length})</span></h2><div class="tablewrap"><table><thead><tr><th>Name</th><th>Type</th><th>Status</th><th class="num">Hours so far</th><th class="num">${emails.length>1?`<a class="btn small" href="${chaseLink(emails)}">✉ Email all ${emails.length}</a>`:''}</th></tr></thead><tbody>
+      ${out.map(p=>`<tr><td><b>${esc(p.name)}</b></td><td class="meta">${esc(p.type||'')}</td><td>${pill(p.status,STATUS[p.status])}${p.status==='sentback'&&reasonOf(p)?` <span class="meta">${esc(reasonOf(p))}</span>`:''}</td><td class="num">${p.lines.length?fmtHr(p.total):'<span class="meta">–</span>'}</td>
+        <td class="num">${p.email?`<a class="btn small" href="${chaseLink([p.email],p)}">✉ Email</a>`:'<span class="meta">no email</span>'}</td></tr>`).join('')}
+      </tbody></table></div><div class="meta" style="margin-top:6px">Email opens a ready-written message in Outlook. Nothing is sent until you send it.</div>`;
   }
-  html+=`<h2>Everyone</h2><div class="tablewrap"><table><thead><tr><th>Name</th><th>Status</th>${days.map(d=>`<th class="num">${shortDay(d)}<br>${d.slice(8)}</th>`).join('')}<th class="num">Total</th><th>Allowances</th><th>Leave</th></tr></thead><tbody>`;
-  for(const p of w.people){
-    const counted=p.lines.filter(l=>l.status!=='Rejected');
-    const perDay=d=>counted.filter(l=>l.date===d&&!l.allow).reduce((s,l)=>s+l.hr,0);
-    const leaveDay=d=>p.leave.some(l=>l.days.some(x=>x.date===d));
-    const allow=counted.filter(l=>l.allow).map(l=>l.allow);
-    const allowTxt=[...new Set(allow)].map(a=>{const n=allow.filter(x=>x===a).length;return n>1?n+' × '+a:a;}).join(', ');
-    const fresh=w.processed.state!=='no'&&p.lines.some(l=>l.status==='Approved'&&!l.processed);
-    html+=`<tr class="person${OPEN===p.key?' open':''}" onclick="toggle('${esc(p.key).replace(/'/g,"\\'")}')">
-      <td><b>${esc(p.name)}</b>${p.type?`<div class="meta">${esc(p.type)}</div>`:''}</td>
-      <td>${pill(p.status,STATUS[p.status])}${fresh?'<span class="tag">new</span>':''}</td>
-      ${days.map(d=>{const h=perDay(d);return `<td class="num">${h?fmtHr(h):leaveDay(d)?'<span class="pill p-processed">L</span>':'<span class="dim">–</span>'}</td>`;}).join('')}
-      <td class="num"><b>${p.lines.length?fmtHr(p.total):'–'}</b></td>
-      <td>${esc(allowTxt)||'<span class="dim">–</span>'}</td>
-      <td>${p.leave.length?p.leave.map(l=>esc(l.type)+(L_OK(l)?'':' <span class="tag">'+esc(l.status)+'</span>')).join('<br>'):'<span class="dim">–</span>'}</td></tr>`;
-    if(OPEN===p.key) html+=`<tr class="detail"><td colspan="${days.length+5}">${detailHtml(p)}</td></tr>`;
-  }
-  html+='</tbody></table></div><p class="meta">Click a person to see their lines. Approved lines can be corrected until the week is marked processed.</p>';
+
+  const counts={all:w.people.length,todo:w.people.filter(p=>{const s=personState(p);return s.total>s.done;}).length,done:w.people.filter(p=>personState(p).all).length,out:out.length};
+  const chip=(k,t)=>`<button class="chip${FILTER===k?' on':''}" onclick="setFilter('${k}')">${t}<span class="n">${counts[k]}</span></button>`;
+  html+=`<div class="row" style="margin:26px 0 12px"><h2 style="margin:0" class="grow">People</h2>
+    <div class="chips">${chip('all','All')}${chip('todo','To process')}${chip('done','Processed')}${chip('out','Outstanding')}</div>
+    <input class="search" id="search" placeholder="Search name" value="${esc(QUERY)}" oninput="QUERY=this.value.trim().toLowerCase();renderPeople()">
+  </div><div id="people"></div>
+  <datalist id="allowList">${(w.allowances||[]).map(a=>`<option value="${esc(a)}">`).join('')}</datalist>`;
   document.getElementById('weekBody').innerHTML=html;
+  renderPeople();
 }
-const L_OK=l=>l.status==='Approved'||l.status==='Acknowledged';
+function setFilter(k){ FILTER=k; renderWeek(); }
+
+function renderPeople(){
+  const days=weekDays();
+  const list=WEEK.people.filter(matches);
+  if(!list.length){ document.getElementById('people').innerHTML='<div class="card empty">Nobody matches.</div>'; return; }
+  document.getElementById('people').innerHTML=list.map(p=>{
+    const s=personState(p), open=OPEN.has(p.key);
+    const counted=p.lines.filter(l=>l.status!=='Rejected');
+    const cells=days.map(d=>{
+      const h=counted.filter(l=>l.date===d&&!l.allow).reduce((t,l)=>t+l.hr,0);
+      const lv=p.leave.some(l=>l.days.some(x=>x.date===d));
+      return `<div class="${h?'':lv?'lv':'zero'}"><small>${shortDay(d)}</small>${h?fmtHr(h):lv?'Leave':'–'}</div>`;
+    }).join('');
+    const act=!s.total?(p.status==='approved'?'':`<span class="meta">Nothing approved yet</span>`)
+      :s.all?`<button class="btn small done" onclick="event.stopPropagation();unprocessPerson(${js(p.key)})" title="Click to undo">✓ Processed</button>`
+      :`<button class="btn small primary" onclick="event.stopPropagation();processPerson(${js(p.key)})">Process ${s.done?'the rest':'all'}${s.done?` (${s.total-s.done})`:''}</button>`;
+    return `<div class="person${open?' open':''}${s.all?' alldone':''}" id="p-${esc(p.key)}">
+      <div class="top" onclick="togglePerson(${js(p.key)})">
+        <div class="who"><div class="av">${esc(initials(p.name))}</div><div style="min-width:0"><b>${esc(p.name)}</b><span class="meta">${esc(p.type||'')}${s.total?` · ${s.done}/${s.total} processed`:''}</span></div></div>
+        <div>${pill(p.status,STATUS[p.status])}</div>
+        <div class="days">${cells}</div>
+        <div class="tot">${p.lines.length?fmtHr(p.total):'–'}</div>
+        <div class="act">${act}</div>
+      </div>
+      ${open?`<div class="body">${detailHtml(p)}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
 function reasonOf(p){ const r=p.lines.find(l=>l.status==='Rejected'&&l.rejection); return r?'“'+r.rejection+'”':''; }
 function chaseLink(emails,p){
   const wk=weekLabel(WEEK.weekStart,WEEK.weekEnd);
@@ -349,107 +444,141 @@ function chaseLink(emails,p){
   return `mailto:${to}?subject=${encodeURIComponent(subj)}${bcc}&body=${encodeURIComponent(msg)}`;
 }
 
-/* ---------- a person's lines, with corrections ---------- */
-function toggle(key){
-  if(OPEN===key){ if(dirty()&&!confirm('Discard your unsaved changes?')) return; OPEN=null; EDIT=null; }
-  else{ if(dirty()&&!confirm('Discard your unsaved changes?')) return; OPEN=key; EDIT={edits:{},removed:new Set(),added:[]}; }
-  renderWeek();
-}
+/* ---------- a person's lines ---------- */
+function blankEdit(key){ return {key,edits:{},removed:new Set(),added:[],note:''}; }
 function dirty(){ return !!EDIT&&(Object.keys(EDIT.edits).length||EDIT.removed.size||EDIT.added.length); }
+function leaveEdits(){ return !dirty()||confirm('Discard your unsaved changes?'); }
+function togglePerson(key){
+  if(OPEN.has(key)){ if(EDIT&&EDIT.key===key){ if(!leaveEdits()) return; EDIT=null; } OPEN.delete(key); }
+  else OPEN.add(key);
+  renderPeople();
+}
+function editFor(key){ if(!EDIT||EDIT.key!==key){ if(dirty()) return null; EDIT=blankEdit(key); } return EDIT; }
 function canEdit(l){ return l.status==='Approved'&&!l.processed; }
 function detailHtml(p){
-  const days=weekDays();
-  const statusOf=l=>l.status==='Approved'?(l.processed?pill('processed','Processed'):WEEK.processed.state!=='no'?pill('approved','Approved')+'<span class="tag">new</span>':pill('approved','Approved'))
+  const days=weekDays(), E=(EDIT&&EDIT.key===p.key)?EDIT:blankEdit(p.key);
+  const statusOf=l=>l.status==='Approved'?(l.processed?pill('done','Processed'):pill('approved','Approved'))
     :l.status==='Rejected'?pill('sentback','Sent back'):pill('waiting',l.held?'Waiting for senior':'Waiting');
-  let h=`<div class="tablewrap"><table class="lines"><thead><tr><th>Day</th><th>Work order / allowance</th><th class="num">Hours</th><th>Comment</th><th>Status</th><th></th></tr></thead><tbody>`;
-  if(!p.lines.length) h+=`<tr><td colspan="6" class="meta">No timesheet lines this week.</td></tr>`;
+  let h=`<div class="tablewrap"><table class="lines"><thead><tr><th style="width:40px" title="Processed">✓</th><th>Day</th><th>Work order / allowance</th><th class="num">Hours</th><th>Comment</th><th>Status</th><th></th></tr></thead><tbody>`;
+  if(!p.lines.length) h+=`<tr><td colspan="7" class="meta">No timesheet lines this week.</td></tr>`;
   for(const l of p.lines){
-    const e=EDIT.edits[l.id]||{}, gone=EDIT.removed.has(l.id), ed=canEdit(l)&&!gone;
+    const e=E.edits[l.id]||{}, gone=E.removed.has(l.id), ed=canEdit(l)&&!gone;
     const jobs=l.jobs&&l.jobs.length?` <span class="tag">${esc(l.jobs.join(', '))}</span>`:'';
-    h+=`<tr class="${gone?'removed':''}"><td>${dayLabel(l.date)}</td>
-      <td>${l.allow?esc(l.allow)+' <span class="meta">(allowance)</span>':ed?`<input class="wo" value="${esc(e.wo!=null?e.wo:l.wo)}" oninput="setEdit('${l.id}','wo',this.value)">`:esc(l.wo)||'<span class="dim">–</span>'}${jobs}</td>
-      <td class="num">${l.allow?'':ed?`<input class="hr" type="number" step="0.25" min="0" max="24" value="${e.hr!=null?e.hr:l.hr}" oninput="setEdit('${l.id}','hr',this.value)">`:fmtHr(l.hr)}</td>
-      <td>${ed?`<input class="wo" value="${esc(e.comment!=null?e.comment:l.comment)}" oninput="setEdit('${l.id}','comment',this.value)">`:esc(l.comment)}</td>
-      <td>${statusOf(l)}${l.approvedBy?`<div class="meta">${esc(l.approvedBy.replace(/\s*<[^>]*>/,''))}</div>`:''}</td>
-      <td class="num">${canEdit(l)?`<button class="btn small" onclick="event.stopPropagation();toggleRemove('${l.id}')">${gone?'Undo':'Remove'}</button>`:''}</td></tr>`;
+    const tick=l.status==='Approved'&&!gone?`<input type="checkbox" class="tick" ${l.processed?'checked':''} onchange="tickLine(${js(p.key)},${js(l.id)},this)" title="${l.processed?'Processed — untick to undo':'Tick when processed'}">`:'';
+    h+=`<tr class="${gone?'removed':l.processed?'isdone':''}"><td>${tick}</td><td style="white-space:nowrap">${dayLabel(l.date)}</td>
+      <td>${l.allow?esc(l.allow)+' <span class="meta">allowance</span>':ed?`<input class="tx" value="${esc(e.wo!=null?e.wo:l.wo)}" oninput="setEdit(${js(p.key)},${js(l.id)},'wo',this.value)">`:esc(l.wo)||'<span class="meta">–</span>'}${jobs}</td>
+      <td class="num">${l.allow?'':ed?`<input class="hr" type="number" step="0.25" min="0" max="24" value="${e.hr!=null?e.hr:l.hr}" oninput="setEdit(${js(p.key)},${js(l.id)},'hr',this.value)">`:fmtHr(l.hr)}</td>
+      <td>${ed?`<input class="tx" value="${esc(e.comment!=null?e.comment:l.comment)}" oninput="setEdit(${js(p.key)},${js(l.id)},'comment',this.value)">`:esc(l.comment)}</td>
+      <td>${statusOf(l)}${l.processed?`<div class="by">${esc(l.processed.by.split(' ')[0])} · ${esc(whenLabel(l.processed.when))}</div>`:l.approvedBy?`<div class="by">by ${esc(l.approvedBy.replace(/\s*<[^>]*>/,''))}</div>`:''}</td>
+      <td class="num">${canEdit(l)?`<button class="btn small" onclick="toggleRemove(${js(p.key)},${js(l.id)})">${gone?'Undo':'Remove'}</button>`:''}</td></tr>`;
   }
-  EDIT.added.forEach((a,i)=>{
-    h+=`<tr><td>${dayLabel(a.date)}</td><td>${a.kind==='allowance'?esc(a.allow)+' <span class="meta">(allowance)</span>':esc(a.wo)}</td><td class="num">${a.kind==='allowance'?'':fmtHr(a.hr)}</td><td></td><td>${pill('processed','To be added')}</td>
-      <td class="num"><button class="btn small" onclick="event.stopPropagation();EDIT.added.splice(${i},1);renderWeek()">Remove</button></td></tr>`;
+  E.added.forEach((a,i)=>{
+    h+=`<tr class="adding"><td></td><td>${dayLabel(a.date)}</td><td>${a.kind==='allowance'?esc(a.allow)+' <span class="meta">allowance</span>':esc(a.wo)}</td><td class="num">${a.kind==='allowance'?'':fmtHr(a.hr)}</td><td></td><td>${pill('info','To be added')}</td>
+      <td class="num"><button class="btn small" onclick="EDIT.added.splice(${i},1);renderPeople()">Remove</button></td></tr>`;
   });
   h+='</tbody></table></div>';
-  for(const l of p.leave) h+=`<div class="meta" style="margin-top:8px">Leave: <b>${esc(l.type)}</b>${l.code?' ('+esc(l.code)+')':''} — ${l.days.map(d=>dayLabel(d.date)+(d.hours?' '+fmtHr(d.hours)+' h':'')).join(', ')} ${L_OK(l)?'':'<span class="tag">'+esc(l.status)+'</span>'}</div>`;
-  const editable=p.lines.some(canEdit);
-  if(editable){
+  for(const l of p.leave) h+=`<div class="meta" style="margin-top:8px">🌴 <b>${esc(l.type)}</b>${l.code?' ('+esc(l.code)+')':''} — ${l.days.map(d=>dayLabel(d.date)+(d.hours?' '+fmtHr(d.hours)+' h':'')).join(', ')} ${L_OK(l)?'':'<span class="tag">'+esc(l.status)+'</span>'}</div>`;
+  if(p.lines.some(canEdit)){
     const opts=days.map(d=>`<option value="${d}">${dayLabel(d)}</option>`).join('');
-    h+=`<div class="addrow" onclick="event.stopPropagation()">
-        <b style="font-size:13px">Add</b>
-        <select id="addDay">${opts}</select>
-        <input id="addWo" placeholder="Work order" style="width:170px">
-        <input id="addHr" type="number" step="0.25" min="0" max="24" placeholder="Hours" style="width:80px">
-        <button class="btn small" onclick="addLine('${esc(p.key).replace(/'/g,"\\'")}','hours')">Add hours</button>
+    const isDirty=dirty()&&EDIT.key===p.key;
+    h+=`<div class="editbar">
+        <b>Add</b>
+        <select id="addDay-${esc(p.key)}">${opts}</select>
+        <input id="addWo-${esc(p.key)}" placeholder="Work order" style="width:160px">
+        <input id="addHr-${esc(p.key)}" type="number" step="0.25" min="0" max="24" placeholder="Hours" style="width:80px">
+        <button class="btn small" onclick="addLine(${js(p.key)},'hours')">+ Hours</button>
         <span class="meta">or</span>
-        <input id="addAllow" list="allowList" placeholder="Allowance" style="width:190px">
-        <datalist id="allowList">${(WEEK.allowances||[]).map(a=>`<option value="${esc(a)}">`).join('')}</datalist>
-        <button class="btn small" onclick="addLine('${esc(p.key).replace(/'/g,"\\'")}','allowance')">Add allowance</button>
+        <input id="addAllow-${esc(p.key)}" list="allowList" placeholder="Allowance" style="width:180px">
+        <button class="btn small" onclick="addLine(${js(p.key)},'allowance')">+ Allowance</button>
       </div>
-      <div class="addrow" onclick="event.stopPropagation()">
-        <input id="editNote" placeholder="Reason for the change (saved with it)" style="flex:1;min-width:220px" value="${esc(EDIT.note||'')}" oninput="EDIT.note=this.value">
-        <button class="btn primary" onclick="saveEdits('${esc(p.key).replace(/'/g,"\\'")}')"${dirty()?'':' disabled'}>Save changes</button>
-        ${dirty()?`<button class="btn" onclick="EDIT={edits:{},removed:new Set(),added:[]};renderWeek()">Cancel</button>`:''}
+      <div class="row" style="margin-top:10px">
+        <input placeholder="Reason for the change (saved with it)" class="grow" style="min-width:220px" value="${esc(E.note||'')}" oninput="const x=editFor(${js(p.key)});if(x)x.note=this.value">
+        <button class="btn primary" id="save-${esc(p.key)}" onclick="saveEdits(${js(p.key)})"${isDirty?'':' disabled'}>Save changes</button>
+        ${isDirty?`<button class="btn" onclick="EDIT=null;renderPeople()">Cancel</button>`:''}
       </div>`;
-  }else if(p.lines.length&&WEEK.processed.state==='yes') h+='<div class="meta" style="margin-top:8px">This week is processed. Reopen it to make changes.</div>';
-  else if(p.lines.length) h+='<div class="meta" style="margin-top:8px">Only approved lines can be changed here. Waiting or sent-back lines are for the supervisor and the worker.</div>';
-  if(p.log.length) h+=`<div class="log"><b>Payroll changes</b>${p.log.map(x=>`<div>${esc(x)}</div>`).join('')}</div>`;
+  }else if(p.lines.length&&personState(p).all) h+='<div class="meta" style="margin-top:10px">All processed. Untick a line (or click ✓ Processed) to change it.</div>';
+  else if(p.lines.length) h+='<div class="meta" style="margin-top:10px">Only approved lines can be changed here. Waiting or sent-back lines are for the supervisor and the worker.</div>';
+  if(p.log.length) h+=`<div class="log"><b>History</b>${p.log.map(x=>`<div>${esc(x)}</div>`).join('')}</div>`;
   return h;
 }
-function setEdit(id,k,v){
-  const l=WEEK.people.flatMap(p=>p.lines).find(x=>x.id===id); if(!l) return;
-  const e=EDIT.edits[id]=EDIT.edits[id]||{};
-  if(String(v)===String(l[k==='hr'?'hr':k])) delete e[k]; else e[k]=v;
-  if(!Object.keys(e).length) delete EDIT.edits[id];
-  const b=document.querySelector('tr.detail .btn.primary'); if(b) b.disabled=!dirty();
+function setEdit(key,id,k,v){
+  const x=editFor(key); if(!x){ toast('Save or cancel the changes for the other person first'); renderPeople(); return; }
+  const l=WEEK.people.flatMap(p=>p.lines).find(z=>z.id===id); if(!l) return;
+  const e=x.edits[id]=x.edits[id]||{};
+  if(String(v)===String(l[k])) delete e[k]; else e[k]=v;
+  if(!Object.keys(e).length) delete x.edits[id];
+  const b=document.getElementById('save-'+key); if(b) b.disabled=!dirty();
 }
-function toggleRemove(id){ EDIT.removed.has(id)?EDIT.removed.delete(id):EDIT.removed.add(id); renderWeek(); }
+function toggleRemove(key,id){ const x=editFor(key); if(!x){ toast('Save or cancel the changes for the other person first'); return; } x.removed.has(id)?x.removed.delete(id):x.removed.add(id); renderPeople(); }
 function addLine(key,kind){
-  const date=document.getElementById('addDay').value;
+  const x=editFor(key); if(!x){ toast('Save or cancel the changes for the other person first'); return; }
+  const v=id=>document.getElementById(id+'-'+key);
+  const date=v('addDay').value;
   if(kind==='allowance'){
-    const allow=document.getElementById('addAllow').value.trim();
+    const allow=v('addAllow').value.trim();
     if(!allow){ toast('Choose the allowance first'); return; }
-    EDIT.added.push({person:key,kind,date,allow});
+    x.added.push({person:key,kind,date,allow});
   }else{
-    const hr=parseFloat(document.getElementById('addHr').value);
+    const hr=parseFloat(v('addHr').value);
     if(!(hr>0&&hr<=24)){ toast('Enter hours between 0 and 24'); return; }
-    EDIT.added.push({person:key,kind,date,hr,wo:document.getElementById('addWo').value.trim()});
+    x.added.push({person:key,kind,date,hr,wo:v('addWo').value.trim()});
   }
-  renderWeek();
+  renderPeople();
 }
 async function saveEdits(key){
-  if(!dirty()) return;
-  const note=EDIT.note||'';
-  const b=document.querySelector('tr.detail .btn.primary'); if(b){ b.disabled=true; b.textContent='Saving…'; }
+  if(!dirty()||EDIT.key!==key) return;
+  const b=document.getElementById('save-'+key); if(b){ b.disabled=true; b.textContent='Saving…'; }
   try{
-    const r=await api({action:'edit',site:WEEK.site,weekStart:WEEK.weekStart,edits:EDIT.edits,removedIds:[...EDIT.removed],added:EDIT.added,note});
+    const r=await api({action:'edit',site:WEEK.site,weekStart:WEEK.weekStart,edits:EDIT.edits,removedIds:[...EDIT.removed],added:EDIT.added,note:EDIT.note||''});
     toast(`Saved — ${[r.changed&&r.changed+' changed',r.removed&&r.removed+' removed',r.added&&r.added+' added'].filter(Boolean).join(', ')||'no changes'}`);
-    const open=OPEN; await loadWeek(WEEK.site,WEEK.weekStart); OPEN=open; EDIT={edits:{},removed:new Set(),added:[]}; renderWeek();
+    await loadWeek(WEEK.site,WEEK.weekStart,true);
   }catch(e){ toast(e.message); if(b){ b.disabled=false; b.textContent='Save changes'; } }
 }
 
-/* ---------- processed / downloads ---------- */
-async function markProcessed(){
-  if(!WEEK) return;
-  const reopen=WEEK.processed.state==='yes';
-  const out=WEEK.people.filter(p=>p.status!=='approved').length;
-  const msg=reopen?'Reopen this week? Approved lines can be changed again, and it will need marking processed again.'
-    :(out?`${out} ${out===1?'person is':'people are'} still outstanding. Mark the approved lines processed anyway? `:'Mark this week processed? ')+'Approved lines are locked from payroll changes until it’s reopened.';
-  if(!confirm(msg)) return;
-  const b=document.getElementById('procBtn'); b.disabled=true;
+/* ---------- processed: one line, one person, or the whole week ---------- */
+function applyProcessed(ids,on,by,when){
+  const set=new Set(ids);
+  for(const p of WEEK.people) for(const l of p.lines) if(set.has(l.id)) l.processed=on?{by,when}:null;
+}
+async function setProcessed(body,on){
+  if(BUSY) return false;
+  if(dirty()){ toast('Save or cancel your changes first'); return false; }
+  BUSY=true;
   try{
-    const r=await api({action:reopen?'reopen':'process',site:WEEK.site,weekStart:WEEK.weekStart});
-    toast(reopen?`Reopened (${r.updated} lines)`:`Marked processed (${r.updated} lines)`);
-    await loadWeek(WEEK.site,WEEK.weekStart);
-  }catch(e){ toast(e.message); }
-  b.disabled=false;
+    const r=await api({...body,action:on?'process':'reopen',site:WEEK.site,weekStart:WEEK.weekStart});
+    applyProcessed(r.ids||[],on,r.by,r.when);
+    renderWeek();
+    return r;
+  }catch(e){ toast(e.message); return false; }
+  finally{ BUSY=false; }
+}
+async function tickLine(key,id,box){
+  box.disabled=true;
+  const r=await setProcessed({ids:[id]},box.checked);
+  if(!r){ box.checked=!box.checked; box.disabled=false; }
+}
+async function processPerson(key){
+  const p=WEEK.people.find(x=>x.key===key);
+  const r=await setProcessed({person:key},true);
+  if(r) toast(`${p?p.name.split(' ')[0]+':':''} ${r.updated} line${r.updated===1?'':'s'} processed`);
+}
+async function unprocessPerson(key){
+  const p=WEEK.people.find(x=>x.key===key);
+  if(!confirm(`Undo processed for ${p?p.name:'this person'}? Their approved lines can then be changed again.`)) return;
+  const r=await setProcessed({person:key},false);
+  if(r) toast(`${r.updated} line${r.updated===1?'':'s'} reopened`);
+}
+async function processWeek(){
+  if(!WEEK) return;
+  const ws=weekState(), reopen=ws.total&&ws.done===ws.total;
+  const out=WEEK.people.filter(p=>p.status!=='approved').length;
+  const msg=reopen?'Reopen the whole week? Every approved line can be changed again, and will need processing again.'
+    :(out?`${out} ${out===1?'person is':'people are'} still outstanding. Process everything that's approved anyway?`:`Process all ${ws.total-ws.done} remaining approved lines?`);
+  if(!confirm(msg)) return;
+  const b=document.getElementById('procBtn'); b.disabled=true; b.textContent='Working…';
+  const r=await setProcessed({},!reopen);
+  if(r) toast(reopen?`Reopened ${r.updated} lines`:`Processed ${r.updated} lines`);
+  else renderWeek();
 }
 async function download(format){
   if(!WEEK) return;
