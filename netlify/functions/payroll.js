@@ -137,6 +137,86 @@ async function leaveFor(token, site, ws, we) {
 }
 
 // ---- one site's week, shaped per person ----
+// ---- employee lookup: everyone who can have a timesheet, and one person's history ----
+// Sites list, every row (inactive too) → { id: name }
+async function siteNamesById(token) {
+  const out = {};
+  for (const it of await listByName(token, 'Sites')) { const n = String((it.fields || {}).Title || '').trim(); if (n) out[String(it.id)] = n; }
+  return out;
+}
+const lookupNames = (v, byId) => (Array.isArray(v) ? v : (v != null && v !== '' ? [v] : [])).map(x => byId[String(x && typeof x === 'object' ? x.LookupId : x)]).filter(Boolean);
+async function allPeople(token) {
+  const [byId, workers, contractors] = await Promise.all([siteNamesById(token), listByName(token, 'Workers'), listByName(token, 'Contractors')]);
+  const siteOf = (f, textKeys, idKeys) => {
+    for (const k of textKeys) if (typeof f[k] === 'string' && f[k].trim()) return f[k].trim();
+    for (const k of idKeys) { const n = lookupNames(f[k], byId); if (n.length) return n.join(', '); }
+    return '';
+  };
+  const out = [];
+  for (const it of workers) {
+    const f = it.fields || {}; const name = String(f.Title || '').trim(); if (!name) continue;
+    const ch = parseFloat(f.ContractHours);
+    out.push({ name, type: 'Staff', id: '', email: String(f.Email || '').trim() || S.emailFromName(name),
+      site: siteOf(f, ['HomeSite', 'Site'], ['HomeSiteLookupId', 'SiteLookupId']), active: f.Active !== false, contractHours: ch > 0 ? ch : 0 });
+  }
+  for (const it of contractors) {
+    const f = it.fields || {}; const name = String(f.Title || f.Name || '').trim(); if (!name) continue;
+    out.push({ name, type: 'Contractor', id: String(it.id), email: String(f.Email || '').trim(),
+      site: siteOf(f, ['Site'], ['SiteLookupId']), active: f.Active !== false, contractHours: 0 });
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name) || a.type.localeCompare(b.type));
+}
+// Is this Timesheets row the person's? By ContractorId (contractors), name, or the company email.
+function rowIsPerson(f, who) {
+  if (who.id && String(f.ContractorId || '').trim() === who.id) return true;
+  const n = String(f.Title || '').trim().toLowerCase();
+  if (n && n === who.name.toLowerCase()) return true;
+  const e = S.emailFromName(f.Title);
+  return !!(e && who.email && e === who.email.toLowerCase());
+}
+// One person's rows lo..hi, grouped by pay week, with everything the row holds.
+function personWeeks(rows, leave) {
+  const weeks = {};
+  for (const it of rows) {
+    const f = it.fields || {};
+    const ws = S.payWeekOf(f) || dayOf(f);
+    const w = weeks[ws] || (weeks[ws] = { weekStart: ws, weekEnd: L.isoOf(L.msOf(ws) + 6 * 86400000), lines: [], sites: new Set(), leave: [] });
+    const notes = String(f.Notes || '');
+    const pm = PROC_RE.exec(notes);
+    if (f.Site) w.sites.add(String(f.Site).trim());
+    w.lines.push({
+      id: String(it.id), date: dayOf(f), site: String(f.Site || '').trim(), status: String(f.Status || 'Submitted').trim(),
+      allow: isAllow(f) ? (String(f.Allowance || f.WorkOrder || '').trim() || 'Allowance') : '',
+      wo: isAllow(f) ? '' : String(f.WorkOrder || '').trim(), hr: isAllow(f) ? 0 : r2(f.Hours),
+      jobs: isAllow(f) ? [] : S.jobAllowancesOf(f), comment: String(f.Comment || ''),
+      shiftWorked: String(f.ShiftWorked || '').trim(), rostered: String(f.RosteredShift || '').trim(),
+      approvedBy: String(f.ApprovedBy || '').replace(/\s*<[^>]*>/, '').trim(), approvedDate: String(f.ApprovedDate || ''),
+      rejection: String(f.RejectionReason || '').trim(), held: S.HELD_RE.test(notes),
+      processed: pm ? { by: pm[1].trim(), when: pm[2] } : null,
+      notes: notes.split(/\s+·\s+/).map(x => x.trim()).filter(Boolean),
+      created: String(it.createdDateTime || ''), modified: String(it.lastModifiedDateTime || ''),
+      batch: String(f.BatchID || '').trim(),
+    });
+  }
+  for (const l of leave) {
+    for (const d of l.days) {
+      const w = Object.values(weeks).find(x => d.date >= x.weekStart && d.date <= x.weekEnd);
+      if (w) { let e = w.leave.find(x => x.type === l.type && x.status === l.status); if (!e) w.leave.push(e = { type: l.type, code: l.code, status: l.status, days: [] }); e.days.push(d); }
+    }
+  }
+  return Object.values(weeks).map(w => {
+    w.lines.sort((a, b) => a.date.localeCompare(b.date) || (a.allow ? 1 : 0) - (b.allow ? 1 : 0));
+    const has = st => w.lines.some(l => l.status === st);
+    const ap = w.lines.filter(l => l.status === 'Approved');
+    return {
+      ...w, sites: [...w.sites].sort(),
+      status: has('Rejected') && !has('Submitted') ? 'sentback' : w.lines.some(l => l.status === 'Submitted' && l.held) ? 'senior' : has('Submitted') ? 'waiting' : 'approved',
+      total: r2(w.lines.filter(l => l.status !== 'Rejected').reduce((t, l) => t + l.hr, 0)),
+      processed: { total: ap.length, done: ap.filter(l => l.processed).length },
+    };
+  }).sort((a, b) => b.weekStart.localeCompare(a.weekStart));
+}
+
 function personKeyOf(f) { return String(f.ContractorId || f.Title || '').trim() || 'unknown'; }
 function shapeWeek(site, ws, we, rows, expected, leave) {
   const people = {};
@@ -275,6 +355,43 @@ exports.handler = async (event) => {
         return { site: w.s.name, weekStart: w.weekStart, weekEnd: w.weekEnd, summary: wk.summary, processed: wk.processed };
       }));
       return reply(200, { ok: true, sites: out });
+    }
+
+    // ---- employee lookup: the list of people ----
+    if (action === 'people') return reply(200, { ok: true, people: await allPeople(token) });
+
+    // ---- employee lookup: one person's timesheets, past or present ----
+    // { person:{ name, id?, email? }, from, to }  (ISO dates; at most a year at a time)
+    if (action === 'person') {
+      const q = data.person || {};
+      const who = { name: String(q.name || '').trim(), id: String(q.id || '').trim(), email: String(q.email || '').trim() };
+      if (!who.name) return reply(400, { ok: false, error: 'Choose a person.' });
+      const to = L.validDate(data.to) ? data.to : L.isoOf(Date.now());
+      let from = L.validDate(data.from) ? data.from : L.isoOf(L.msOf(to) - 83 * 86400000);
+      if (L.msOf(to) - L.msOf(from) > 371 * 86400000) from = L.isoOf(L.msOf(to) - 371 * 86400000);
+      if (from > to) return reply(400, { ok: false, error: 'The start date is after the end date.' });
+      const [rows, people, lv] = await Promise.all([
+        rowsBetween(token, L.isoOf(L.msOf(from) - 6 * 86400000), L.isoOf(L.msOf(to) + 6 * 86400000)),   // a whole pay week either side
+        allPeople(token),
+        memo('leave', () => L.getRequests(token)).then(r => r.requests).catch(() => []),
+      ]);
+      const info = people.find(p => p.name.toLowerCase() === who.name.toLowerCase() && (!who.id || p.id === who.id)) || { ...who, type: '', site: '' };
+      if (!who.email) who.email = info.email || S.emailFromName(who.name);
+      const mine = rows.filter(it => rowIsPerson(it.fields || {}, who));
+      const types = await memo('leavetypes', () => L.getLeaveTypes(token)).catch(() => []);
+      const leave = lv.filter(r => (r.name.toLowerCase() === who.name.toLowerCase() || (who.email && r.email === who.email.toLowerCase())))
+        .map(r => {
+          const all = L.daysOf(r);
+          return { type: r.type, code: ((types.find(t => t.title === r.type) || {}).code || ''), status: r.status, start: r.start, end: r.end, note: r.note,
+            days: all.map(d => ({ date: d, hours: r2(r.dayHours[d] != null ? r.dayHours[d] : (r.hours && all.length ? r.hours / all.length : 0)) })) };
+        });
+      const inRange = leave.filter(r => r.end >= from && r.start <= to);
+      const weeks = personWeeks(mine, inRange).filter(w => w.weekEnd >= from && w.weekStart <= to);
+      return reply(200, {
+        ok: true, person: { ...info, name: info.name || who.name, email: who.email }, from, to, weeks,
+        leave: inRange.filter(r => r.status !== 'Cancelled'),
+        totals: { hours: r2(weeks.reduce((t, w) => t + w.total, 0)), weeks: weeks.length },
+      });
     }
 
     siteOk();

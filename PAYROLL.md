@@ -32,6 +32,20 @@
 
   Processed lines and people turn grey, and each line shows who processed it and when. To change a processed line, untick it, or click **✓ Processed** on the person to undo theirs. The filter chips (**To process**, **Processed**, **Outstanding**) and the name search narrow the list. Lines approved later arrive unticked, so they show up under **To process**. Processing is saved on each line's Notes ("Processed for payroll by … on …").
 
+- **Look up any employee (Employees tab).** Search for anyone on the Workers or Contractors lists, including inactive people. Then pick a period:
+  - the last 4 or 12 weeks, 6 months or 12 months;
+  - **One pay week**: any date, and you get the pay week it falls in;
+  - **Between dates**, up to a year.
+
+  You see their details (type, home site, email, contract hours), totals and leave, then each pay week, newest first. Open a week to see every line:
+  - site, work order or allowance, and hours;
+  - call-out tags;
+  - shift worked against the rostered shift;
+  - comment;
+  - status, who approved it and when, any send-back reason, and who processed it.
+
+  Each week also shows when the timesheet was first saved and last changed, and its full history of notes. **Print** prints the lot. **Open … pay week** jumps to that site's week to process or correct it. The address in the browser links straight back to the same person and period.
+
 ## Setup
 
 1. **Give payroll access.** In the timesheet **Settings** list, add a row:

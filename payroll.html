@@ -114,6 +114,37 @@
   .empty{padding:30px;text-align:center;color:var(--muted);}
   #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:#1c2230;color:#fff;padding:10px 16px;border-radius:8px;font-size:13.5px;opacity:0;transition:.2s;pointer-events:none;z-index:50;}
   #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  .tabs{display:flex;gap:4px;margin:0 0 18px;border-bottom:1px solid var(--line);}
+  .tabs button{border:0;background:none;padding:10px 14px;font-size:14px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;}
+  .tabs button.on{color:var(--brand);border-bottom-color:var(--brand);}
+  .finder{position:relative;flex:1;min-width:260px;max-width:460px;}
+  .finder input{width:100%;padding:10px 12px;font-size:14.5px;}
+  .sugg{position:absolute;left:0;right:0;top:100%;margin-top:4px;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(20,30,60,.12);max-height:340px;overflow:auto;z-index:30;}
+  .sugg button{display:flex;width:100%;gap:10px;align-items:center;border:0;background:none;padding:9px 12px;text-align:left;cursor:pointer;font-size:13.5px;}
+  .sugg button:hover,.sugg button.hi{background:#f1f5fd;}
+  .sugg .meta{margin-left:auto;font-size:12px;}
+  .profile{display:flex;gap:16px;align-items:center;flex-wrap:wrap;}
+  .profile .av{width:52px;height:52px;font-size:17px;}
+  .kv{display:flex;gap:26px;flex-wrap:wrap;margin-top:4px;}
+  .kv div span{display:block;font-size:12px;color:var(--muted);}
+  .kv div b{font-size:14px;font-weight:600;}
+  .wk{background:#fff;border:1px solid var(--line);border-radius:12px;margin-bottom:10px;overflow:hidden;}
+  .wk .top{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:12px 16px;cursor:pointer;}
+  .wk .top:hover{background:#f8faff;}
+  .wk.open .top{background:#f4f7fd;border-bottom:1px solid var(--line);}
+  .wk .top .rng{font-weight:700;font-size:14.5px;min-width:190px;}
+  .wk .body{padding:12px 16px 16px;background:#fbfcfe;}
+  .full td{font-size:12.5px;vertical-align:top;}
+  .full .sub{font-size:11.5px;color:var(--muted);}
+  .hist{font-size:11.5px;color:var(--muted);padding:2px 0 0 0;}
+  .hist li{margin:1px 0;}
+  @media print{
+    .appbar,.tabs,.noprint,#toast{display:none !important;}
+    body{background:#fff;}
+    .wrap{padding:0;max-width:none;}
+    .wk{break-inside:avoid;border-color:#ccc;}
+    .wk .body{display:block !important;}
+  }
   @media (max-width:900px){
     .person .top{grid-template-columns:1fr auto;}
     .person .top .days{grid-column:1 / -1;order:3;}
@@ -148,6 +179,10 @@
 </div>
 
 <div class="wrap hidden" id="app">
+  <div class="tabs">
+    <button id="tabWeeks" class="on" onclick="goHome()">Pay weeks</button>
+    <button id="tabEmp" onclick="goEmp()">Employees</button>
+  </div>
   <!-- home: every site's pay week -->
   <div id="home">
     <div class="head">
@@ -184,13 +219,36 @@
     </div>
     <div id="weekBody"><div class="meta" style="margin-top:20px">Loading…</div></div>
   </div>
+
+  <!-- one employee's timesheets, past or present -->
+  <div id="emp" class="hidden">
+    <div class="head noprint">
+      <div class="finder">
+        <input id="empSearch" placeholder="Search for an employee or contractor" autocomplete="off"
+          oninput="suggest(this.value)" onfocus="suggest(this.value)" onkeydown="suggestKey(event)">
+        <div class="sugg hidden" id="sugg"></div>
+      </div>
+      <select id="empRange" onchange="rangeChanged()">
+        <option value="4">Last 4 weeks</option>
+        <option value="12" selected>Last 12 weeks</option>
+        <option value="26">Last 6 months</option>
+        <option value="52">Last 12 months</option>
+        <option value="week">One pay week…</option>
+        <option value="custom">Between dates…</option>
+      </select>
+      <input type="date" id="empDate" class="hidden" onchange="loadEmp()" title="Any day in the pay week">
+      <input type="date" id="empFrom" class="hidden" onchange="loadEmp()">
+      <input type="date" id="empTo" class="hidden" onchange="loadEmp()">
+    </div>
+    <div id="empBody" style="margin-top:18px"><div class="card empty">Search for someone to see their timesheets — any week, past or present.</div></div>
+  </div>
 </div>
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.27.0/lib/msal-browser.min.js"></script>
 <script src="config.js"></script>
 <script>
-const APP_VERSION='1.1';
+const APP_VERSION='1.2';
 const SCOPES=['openid','profile','email'];
 const IN_FRAME=(()=>{ try{ return window.self!==window.top; }catch(_){ return true; } })();
 let msalInstance=null, account=null, ME=null, WEEK=null, OPEN=new Set(), EDIT=null, FILTER='all', QUERY='', BUSY=false;
@@ -274,23 +332,26 @@ async function start(){
   document.getElementById('app').classList.remove('hidden');
   document.getElementById('siteSel').innerHTML=ME.sites.map(s=>`<option>${esc(s.name)}</option>`).join('');
   const q=new URLSearchParams(location.hash.slice(1));
-  if(q.get('site')&&ME.sites.some(s=>s.name===q.get('site'))) openWeek(q.get('site'),q.get('week')||'');
-  else goHome();
+  if(q.has('emp')) showEmp(q);
+  else if(q.get('site')&&ME.sites.some(s=>s.name===q.get('site'))) openWeek(q.get('site'),q.get('week')||'');
+  else showHome();
 }
 window.addEventListener('hashchange',()=>{
   if(!ME||!ME.admin) return;
   const q=new URLSearchParams(location.hash.slice(1));
-  if(!q.get('site')){ if(!document.getElementById('week').classList.contains('hidden')) showHome(); }
+  if(q.has('emp')){ if(document.getElementById('emp').classList.contains('hidden')||empHash()!==location.hash) showEmp(q); }
+  else if(!q.get('site')){ if(document.getElementById('home').classList.contains('hidden')) showHome(); }
   else if(!WEEK||WEEK.site!==q.get('site')||WEEK.weekStart!==q.get('week')) openWeek(q.get('site'),q.get('week')||'');
 });
 
 /* ---------- home ---------- */
-function goHome(){ if(location.hash) history.pushState(null,'',location.pathname+location.search); showHome(); }
-function showHome(){
-  document.getElementById('week').classList.add('hidden');
-  document.getElementById('home').classList.remove('hidden');
-  WEEK=null; loadHome();
+function showView(v){
+  for(const id of ['home','week','emp']) document.getElementById(id).classList.toggle('hidden',id!==v);
+  document.getElementById('tabWeeks').classList.toggle('on',v!=='emp');
+  document.getElementById('tabEmp').classList.toggle('on',v==='emp');
 }
+function goHome(){ if(!leaveEdits()) return; if(location.hash) history.pushState(null,'',location.pathname+location.search); showHome(); }
+function showHome(){ showView('home'); WEEK=null; EDIT=null; loadHome(); }
 async function loadHome(){
   const box=document.getElementById('siteCards');
   box.innerHTML='<div class="meta">Loading…</div>';
@@ -322,8 +383,7 @@ function siteWeeks(site){ return ((ME.sites.find(s=>s.name===site)||{}).weeks)||
 function openWeek(site,weekStart){
   const weeks=siteWeeks(site);
   if(!weekStart) weekStart=(weeks[1]||weeks[0]||{}).weekStart;
-  document.getElementById('home').classList.add('hidden');
-  document.getElementById('week').classList.remove('hidden');
+  showView('week');
   document.getElementById('siteSel').value=site;
   fillWeeks(site,weekStart);
   const h='#site='+encodeURIComponent(site)+'&week='+weekStart;
@@ -533,6 +593,168 @@ async function saveEdits(key){
     toast(`Saved — ${[r.changed&&r.changed+' changed',r.removed&&r.removed+' removed',r.added&&r.added+' added'].filter(Boolean).join(', ')||'no changes'}`);
     await loadWeek(WEEK.site,WEEK.weekStart,true);
   }catch(e){ toast(e.message); if(b){ b.disabled=false; b.textContent='Save changes'; } }
+}
+
+/* ---------- employees: anyone's timesheets, any week ---------- */
+let PEOPLE=null, PERSON=null, EMP=null, SUGG=[], SUGGI=-1, EMP_OPEN=new Set();
+function goEmp(){ if(!leaveEdits()) return; EDIT=null; history.pushState(null,'',PERSON?empHash():'#emp'); showEmp(new URLSearchParams(location.hash.slice(1))); }
+function empHash(){
+  if(!PERSON) return '#emp';
+  const r=document.getElementById('empRange').value, q=new URLSearchParams({emp:PERSON.name});
+  if(PERSON.id) q.set('id',PERSON.id);
+  q.set('range',r);
+  if(r==='week') q.set('date',document.getElementById('empDate').value);
+  if(r==='custom'){ q.set('from',document.getElementById('empFrom').value); q.set('to',document.getElementById('empTo').value); }
+  return '#'+q.toString();
+}
+async function showEmp(q){
+  showView('emp'); WEEK=null;
+  if(!PEOPLE){ try{ PEOPLE=(await api({action:'people'})).people; }catch(e){ toast(e.message); PEOPLE=[]; } }
+  const name=q&&q.get('emp');
+  if(!name) return;
+  if(q.get('range')) document.getElementById('empRange').value=q.get('range');
+  if(q.get('date')) document.getElementById('empDate').value=q.get('date');
+  if(q.get('from')) document.getElementById('empFrom').value=q.get('from');
+  if(q.get('to')) document.getElementById('empTo').value=q.get('to');
+  showRangeInputs();
+  PERSON=PEOPLE.find(p=>p.name===name&&(!q.get('id')||p.id===q.get('id')))||{name,id:q.get('id')||'',email:''};
+  document.getElementById('empSearch').value=PERSON.name;
+  loadEmp(true);
+}
+function suggest(v){
+  const box=document.getElementById('sugg'), t=String(v||'').trim().toLowerCase();
+  SUGG=(PEOPLE||[]).filter(p=>!t||p.name.toLowerCase().includes(t)).slice(0,40); SUGGI=-1;
+  if(!SUGG.length){ box.innerHTML=t?'<div class="meta" style="padding:10px 12px">Nobody by that name</div>':''; box.classList.toggle('hidden',!t); return; }
+  box.innerHTML=SUGG.map((p,i)=>`<button onmousedown="event.preventDefault();pickPerson(${i})"><span class="av" style="width:28px;height:28px;font-size:11px">${esc(initials(p.name))}</span>
+    <span><b>${esc(p.name)}</b>${p.active?'':' <span class="tag">inactive</span>'}</span><span class="meta">${esc(p.type)}${p.site?' · '+esc(p.site):''}</span></button>`).join('');
+  box.classList.remove('hidden');
+}
+document.addEventListener('click',e=>{ if(!e.target.closest('.finder')) document.getElementById('sugg').classList.add('hidden'); });
+function suggestKey(e){
+  const box=document.getElementById('sugg');
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){ e.preventDefault(); SUGGI=Math.max(0,Math.min(SUGG.length-1,SUGGI+(e.key==='ArrowDown'?1:-1))); [...box.querySelectorAll('button')].forEach((b,i)=>b.classList.toggle('hi',i===SUGGI)); }
+  else if(e.key==='Enter'){ e.preventDefault(); if(SUGG.length) pickPerson(SUGGI<0?0:SUGGI); }
+  else if(e.key==='Escape') box.classList.add('hidden');
+}
+function pickPerson(i){
+  PERSON=SUGG[i]; if(!PERSON) return;
+  document.getElementById('empSearch').value=PERSON.name;
+  document.getElementById('sugg').classList.add('hidden');
+  EMP_OPEN=new Set(); loadEmp();
+}
+function showRangeInputs(){
+  const r=document.getElementById('empRange').value;
+  document.getElementById('empDate').classList.toggle('hidden',r!=='week');
+  document.getElementById('empFrom').classList.toggle('hidden',r!=='custom');
+  document.getElementById('empTo').classList.toggle('hidden',r!=='custom');
+}
+function rangeChanged(){
+  showRangeInputs();
+  const r=document.getElementById('empRange').value, today=new Date().toISOString().slice(0,10);
+  if(r==='week'&&!document.getElementById('empDate').value) document.getElementById('empDate').value=today;
+  if(r==='custom'){ if(!document.getElementById('empTo').value) document.getElementById('empTo').value=today; if(!document.getElementById('empFrom').value) document.getElementById('empFrom').value=addDays(today,-27); }
+  loadEmp();
+}
+function empRange(){
+  const r=document.getElementById('empRange').value, today=new Date().toISOString().slice(0,10);
+  if(r==='week'){ const d=document.getElementById('empDate').value||today; return {from:d,to:d}; }
+  if(r==='custom') return {from:document.getElementById('empFrom').value||addDays(today,-27),to:document.getElementById('empTo').value||today};
+  return {from:addDays(today,-7*(+r)+1),to:today};
+}
+async function loadEmp(fromHash){
+  if(!PERSON) return;
+  if(!fromHash){ const h=empHash(); if(location.hash!==h) history.pushState(null,'',h); }
+  const body=document.getElementById('empBody');
+  body.innerHTML='<div class="meta">Loading '+esc(PERSON.name)+'…</div>';
+  const {from,to}=empRange();
+  try{
+    EMP=await api({action:'person',person:{name:PERSON.name,id:PERSON.id||'',email:PERSON.email||''},from,to});
+    if(document.getElementById('empRange').value==='week'&&EMP.weeks.length) EMP.weeks.forEach(w=>EMP_OPEN.add(w.weekStart));
+    renderEmp();
+  }catch(e){ body.innerHTML=`<div class="err">${esc(e.message)}</div>`; }
+}
+function renderEmp(){
+  const E=EMP, p=E.person;
+  const appr=E.weeks.reduce((t,w)=>t+w.lines.filter(l=>l.status==='Approved').reduce((a,l)=>a+l.hr,0),0);
+  const lvH=E.leave.filter(L_OK).reduce((t,l)=>t+l.days.filter(d=>d.date>=E.from&&d.date<=E.to).reduce((a,d)=>a+d.hours,0),0);
+  let h=`<div class="card"><div class="profile"><div class="av">${esc(initials(p.name))}</div>
+    <div class="grow"><h1>${esc(p.name)}</h1><div class="kv">
+      <div><span>Type</span><b>${esc(p.type||'–')}</b></div>
+      <div><span>Home site</span><b>${esc(p.site||'–')}</b></div>
+      <div><span>Email</span><b>${esc(p.email||'–')}</b></div>
+      ${p.contractHours?`<div><span>Contract</span><b>${fmtHr(p.contractHours)} h / week</b></div>`:''}
+      ${p.active===false?`<div><span>Status</span><b style="color:var(--red)">Inactive</b></div>`:''}
+    </div></div>
+    <div class="row noprint"><button class="btn" onclick="expandAll()">${E.weeks.length&&E.weeks.every(w=>EMP_OPEN.has(w.weekStart))?'Collapse all':'Expand all'}</button><button class="btn" onclick="printEmp()">⎙ Print</button></div>
+  </div></div>
+  <div class="tiles">
+    <div class="tile"><div class="l">Period</div><div class="v" style="font-size:16px;margin-top:7px">${dayLabel(E.from)} – ${dayLabel(E.to)}</div></div>
+    <div class="tile"><div class="l">Pay weeks with timesheets</div><div class="v">${E.weeks.length}</div></div>
+    <div class="tile"><div class="l">Hours (excl. sent back)</div><div class="v">${fmtHr(E.totals.hours)}</div></div>
+    <div class="tile"><div class="l">Approved hours</div><div class="v">${fmtHr(appr)}</div></div>
+    <div class="tile"><div class="l">Leave hours</div><div class="v">${fmtHr(lvH)}</div></div>
+  </div>`;
+  if(E.leave.length) h+=`<h2>Leave</h2><div class="tablewrap"><table><thead><tr><th>Type</th><th>Dates</th><th class="num">Days</th><th class="num">Hours</th><th>Status</th><th>Note</th></tr></thead><tbody>
+    ${E.leave.map(l=>`<tr><td><b>${esc(l.type)}</b>${l.code?` <span class="meta">${esc(l.code)}</span>`:''}</td><td>${dayLabel(l.start)}${l.end!==l.start?' – '+dayLabel(l.end):''}</td><td class="num">${l.days.length}</td><td class="num">${fmtHr(l.days.reduce((a,d)=>a+d.hours,0))}</td>
+      <td>${pill(L_OK(l)?'approved':/declin/i.test(l.status)?'sentback':'waiting',l.status)}</td><td class="meta">${esc(l.note||'')}</td></tr>`).join('')}
+    </tbody></table></div>`;
+  h+=`<h2>Timesheets</h2>`;
+  if(!E.weeks.length) h+=`<div class="card empty">No timesheet lines for ${esc(p.name)} in this period.</div>`;
+  for(const w of E.weeks){
+    const open=EMP_OPEN.has(w.weekStart), pr=w.processed;
+    const procPill=!pr.total?'':pr.done===pr.total?pill('done','✓ Processed'):pr.done?pill('info',`${pr.done}/${pr.total} processed`):pill('done','Not processed');
+    h+=`<div class="wk${open?' open':''}">
+      <div class="top" onclick="toggleWk('${w.weekStart}')">
+        <span class="rng">${weekLabel(w.weekStart,w.weekEnd)}</span>
+        <span class="meta">${esc(w.sites.join(', '))}</span>
+        ${pill(w.status,STATUS[w.status])}${procPill}
+        ${w.leave.length?pill('info','Leave'):''}
+        <span class="grow"></span>
+        <span class="tot">${fmtHr(w.total)} h</span>
+        <span class="meta noprint">${open?'▲':'▼'}</span>
+      </div>
+      ${open?`<div class="body">${empWeekHtml(w)}</div>`:''}
+    </div>`;
+  }
+  document.getElementById('empBody').innerHTML=h;
+}
+function toggleWk(ws){ EMP_OPEN.has(ws)?EMP_OPEN.delete(ws):EMP_OPEN.add(ws); renderEmp(); }
+function expandAll(){ const all=EMP.weeks.every(w=>EMP_OPEN.has(w.weekStart)); EMP_OPEN=new Set(all?[]:EMP.weeks.map(w=>w.weekStart)); renderEmp(); }
+function printEmp(){ EMP_OPEN=new Set(EMP.weeks.map(w=>w.weekStart)); renderEmp(); setTimeout(()=>window.print(),50); }
+function dt(s){ if(!s) return ''; const d=new Date(s); return isNaN(d)?s:d.toLocaleString('en-AU',{day:'numeric',month:'short',year:'numeric',hour:'numeric',minute:'2-digit'}); }
+function empWeekHtml(w){
+  const byDay={};
+  for(const l of w.lines) (byDay[l.date]=byDay[l.date]||[]).push(l);
+  let h=`<div class="tablewrap"><table class="full"><thead><tr><th>Day</th><th>Site</th><th>Work order / allowance</th><th class="num">Hours</th><th>Shift</th><th>Comment</th><th>Status</th></tr></thead><tbody>`;
+  for(const d of Object.keys(byDay).sort()){
+    const ls=byDay[d], dayTot=ls.filter(l=>l.status!=='Rejected').reduce((a,l)=>a+l.hr,0);
+    ls.forEach((l,i)=>{
+      const st=l.status==='Approved'?pill(l.processed?'done':'approved',l.processed?'Processed':'Approved')
+        :l.status==='Rejected'?pill('sentback','Sent back'):pill('waiting',l.held?'Waiting for senior':'Waiting');
+      const sub=[l.status==='Approved'&&l.approvedBy?`Approved by ${esc(l.approvedBy)}${l.approvedDate?' · '+esc(dt(l.approvedDate)):''}`:'',
+        l.processed?`Processed by ${esc(l.processed.by)} · ${esc(whenLabel(l.processed.when))}`:'',
+        l.rejection?`Reason: “${esc(l.rejection)}”`:''].filter(Boolean).map(x=>`<div class="sub">${x}</div>`).join('');
+      const shift=l.shiftWorked||l.rostered?`${esc(l.shiftWorked||'–')}${l.rostered&&l.rostered!==l.shiftWorked?`<div class="sub">rostered ${esc(l.rostered)}</div>`:''}`:'<span class="meta">–</span>';
+      h+=`<tr${l.processed?' class="isdone"':''}><td style="white-space:nowrap">${i===0?`<b>${dayLabel(d)}</b>${ls.length>1?`<div class="sub">${fmtHr(dayTot)} h day</div>`:''}`:''}</td>
+        <td>${esc(l.site)}</td>
+        <td>${l.allow?esc(l.allow)+' <span class="meta">allowance</span>':esc(l.wo)||'<span class="meta">–</span>'}${l.jobs.length?` <span class="tag">${esc(l.jobs.join(', '))}</span>`:''}</td>
+        <td class="num">${l.allow?'':fmtHr(l.hr)}</td>
+        <td>${shift}</td>
+        <td>${esc(l.comment)}</td>
+        <td>${st}${sub}</td></tr>`;
+    });
+  }
+  h+=`<tr><td colspan="3"><b>Week total</b></td><td class="num"><b>${fmtHr(w.total)}</b></td><td colspan="3"></td></tr></tbody></table></div>`;
+  for(const l of w.leave) h+=`<div class="meta" style="margin-top:8px">🌴 <b>${esc(l.type)}</b>${l.code?' ('+esc(l.code)+')':''} — ${l.days.map(d=>dayLabel(d.date)+(d.hours?' '+fmtHr(d.hours)+' h':'')).join(', ')} · ${esc(l.status)}</div>`;
+  const hist=w.lines.flatMap(l=>l.notes.map(n=>({d:l.date,n}))).filter((x,i,a)=>a.findIndex(y=>y.n===x.n)===i);
+  const saved=w.lines.map(l=>l.created).filter(Boolean).sort(), changed=w.lines.map(l=>l.modified).filter(Boolean).sort();
+  h+=`<div class="row" style="margin-top:10px;gap:16px">
+    ${saved.length?`<span class="meta">First saved ${esc(dt(saved[0]))}</span>`:''}
+    ${changed.length?`<span class="meta">Last changed ${esc(dt(changed[changed.length-1]))}</span>`:''}
+    ${w.sites.map(s=>ME.sites.some(x=>x.name===s)?`<button class="btn small noprint" onclick="openWeek(${js(s)},'${w.weekStart}')">Open ${esc(s)} pay week →</button>`:'').join('')}
+  </div>`;
+  if(hist.length) h+=`<details style="margin-top:8px"${document.getElementById('empRange').value==='week'?' open':''}><summary class="meta" style="cursor:pointer">History (${hist.length})</summary><ul class="hist">${hist.map(x=>`<li>${esc(x.n)}</li>`).join('')}</ul></details>`;
+  return h;
 }
 
 /* ---------- processed: one line, one person, or the whole week ---------- */
