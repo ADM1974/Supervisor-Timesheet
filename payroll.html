@@ -138,7 +138,39 @@
   .full .sub{font-size:11.5px;color:var(--muted);}
   .hist{font-size:11.5px;color:var(--muted);padding:2px 0 0 0;}
   .hist li{margin:1px 0;}
+  /* week: People / Allowances switch */
+  .seg{display:inline-flex;background:#e9edf4;border-radius:10px;padding:3px;gap:2px;}
+  .seg button{border:0;background:none;padding:7px 16px;border-radius:8px;font-size:13.5px;font-weight:600;color:var(--muted);cursor:pointer;}
+  .seg button.on{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(20,30,60,.12);}
+  /* allowances */
+  .atiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:0 0 14px;}
+  .atile{background:#fff;border:1px solid var(--line);border-radius:12px;padding:11px 14px;border-top:3px solid var(--k);}
+  .atile b{display:block;font-size:24px;font-weight:600;line-height:1.1;font-variant-numeric:tabular-nums;}
+  .atile .nm{font-size:13px;font-weight:600;margin-top:3px;}
+  .atile .kd{font-size:11px;color:var(--muted);}
+  .k-daily{--k:#2958cc;} .k-job{--k:#c26a00;} .k-weekly{--k:#0f7a55;} .k-shift{--k:#7a5af5;}
+  .shiftrow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 14px;font-size:13px;}
+  .sh{display:inline-block;background:#f0ecfe;color:#4b36a8;border-radius:14px;padding:2px 9px;font-size:12px;font-weight:600;white-space:nowrap;margin:1px 2px 1px 0;}
+  .sh i{font-style:normal;opacity:.7;font-weight:500;margin-left:3px;}
+  .atable th.grp{text-align:center;font-size:11px;letter-spacing:.3px;text-transform:uppercase;border-bottom:3px solid var(--k);background:#fff;}
+  .atable th.col{text-align:center;white-space:normal;min-width:92px;max-width:140px;line-height:1.25;}
+  .atable td.c{text-align:center;font-variant-numeric:tabular-nums;}
+  .atable td.c b{font-size:16px;}
+  .atable td.c small{display:block;font-size:10.5px;color:var(--muted);white-space:nowrap;}
+  .atable td.c .w{display:block;font-size:10.5px;color:var(--amber);font-weight:700;}
+  .atable td.c.none{color:#c8cdd6;}
+  .atable td.nm{position:sticky;left:0;background:#fff;z-index:1;min-width:170px;}
+  .atable th:first-child{position:sticky;left:0;z-index:2;}
+  .atable td.nm button{border:0;background:none;padding:0;font:inherit;font-weight:700;color:var(--ink);cursor:pointer;text-align:left;}
+  .atable td.nm button:hover{color:var(--brand);text-decoration:underline;}
+  .atable tr.isdone td{background:var(--done);color:var(--done-ink);}
+  .atable tr.isdone td .sh{background:#e4e6ec;color:#6b7383;}
+  .atable tr.tot td{background:#f5f7fb;font-weight:700;border-top:2px solid var(--line);}
+  .atable tr.tot td.nm{background:#f5f7fb;}
+  .printonly{display:none;}
   @media print{
+    .printonly{display:block;}
+    .atable td.nm,.atable th:first-child{position:static;}
     .appbar,.tabs,.noprint,#toast{display:none !important;}
     body{background:#fff;}
     .wrap{padding:0;max-width:none;}
@@ -200,18 +232,18 @@
 
   <!-- one site's week -->
   <div id="week" class="hidden">
-    <button class="btn link" onclick="goHome()">← All sites</button>
+    <button class="btn link noprint" onclick="goHome()">← All sites</button>
     <div class="head" style="margin-top:6px">
       <div class="grow">
         <h1 id="weekTitle"></h1>
-        <div class="row" style="margin-top:8px">
+        <div class="row noprint" style="margin-top:8px">
           <select id="siteSel" onchange="pickSite()"></select>
           <button class="btn small" onclick="stepWeek(1)" aria-label="Earlier week">◀</button>
           <select id="weekSel" onchange="pickWeek()"></select>
           <button class="btn small" onclick="stepWeek(-1)" aria-label="Later week">▶</button>
         </div>
       </div>
-      <div class="row">
+      <div class="row noprint">
         <button class="btn" onclick="download('xlsx')">⤓ Excel</button>
         <button class="btn" onclick="download('pdf')">⤓ PDF</button>
         <button class="btn primary" id="procBtn" onclick="processWeek()">Process all approved</button>
@@ -251,10 +283,10 @@
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.27.0/lib/msal-browser.min.js"></script>
 <script src="config.js"></script>
 <script>
-const APP_VERSION='1.3';
+const APP_VERSION='1.4';
 const SCOPES=['openid','profile','email'];
 const IN_FRAME=(()=>{ try{ return window.self!==window.top; }catch(_){ return true; } })();
-let msalInstance=null, account=null, ME=null, WEEK=null, OPEN=new Set(), EDIT=null, FILTER='all', QUERY='', BUSY=false;
+let msalInstance=null, account=null, ME=null, WEEK=null, OPEN=new Set(), EDIT=null, FILTER='all', QUERY='', BUSY=false, VIEW='people', INCL_WAIT=false;
 
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),3200);}
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
@@ -457,13 +489,93 @@ function renderWeek(){
 
   const counts={all:w.people.length,todo:w.people.filter(p=>{const s=personState(p);return s.total>s.done;}).length,done:w.people.filter(p=>personState(p).all).length,out:out.length};
   const chip=(k,t)=>`<button class="chip${FILTER===k?' on':''}" onclick="setFilter('${k}')">${t}<span class="n">${counts[k]}</span></button>`;
-  html+=`<div class="row" style="margin:26px 0 12px"><h2 style="margin:0" class="grow">People</h2>
+  const seg=`<div class="seg noprint"><button class="${VIEW==='people'?'on':''}" onclick="setView('people')">People</button><button class="${VIEW==='allow'?'on':''}" onclick="setView('allow')">Allowances</button></div>`;
+  if(VIEW==='allow'){
+    html+=`<div class="row noprint" style="margin:26px 0 14px">${seg}<span class="grow"></span>
+      <label class="meta" style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" class="tick" ${INCL_WAIT?'checked':''} onchange="INCL_WAIT=this.checked;renderWeek()"> Include not yet approved</label>
+      <button class="btn small" onclick="window.print()">⎙ Print</button></div>
+      <div id="allow">${allowHtml()}</div>`;
+    document.getElementById('weekBody').innerHTML=html;
+    return;
+  }
+  html+=`<div class="row" style="margin:26px 0 12px">${seg}<span class="grow"></span>
     <div class="chips">${chip('all','All')}${chip('todo','To process')}${chip('done','Processed')}${chip('out','Outstanding')}</div>
     <input class="search" id="search" placeholder="Search name" value="${esc(QUERY)}" oninput="QUERY=this.value.trim().toLowerCase();renderPeople()">
   </div><div id="people"></div>
   <datalist id="allowList">${(w.allowances||[]).map(a=>`<option value="${esc(a)}">`).join('')}</datalist>`;
   document.getElementById('weekBody').innerHTML=html;
   renderPeople();
+}
+function setView(v){ if(v!==VIEW&&!leaveEdits()) return; if(v!==VIEW) EDIT=null; VIEW=v; renderWeek(); }
+
+/* ---- allowances: who gets what this week ----
+   Daily / weekly allowances are lines of their own; per-job ones (Call-out) are ticks on an
+   hours line; the shift worked is counted once a day. Approved lines count; with "Include not
+   yet approved" the rest show as "+n waiting". Sent-back lines never count. */
+const KIND={daily:'Per shift / day',job:'Per job',weekly:'Weekly'}, KIND_ORDER={daily:0,job:1,weekly:2};
+function allowData(){
+  const kinds=WEEK.allowanceKinds||{}, jobs=new Set(), rows=[];
+  for(const p of WEEK.people){
+    const r={p,cells:{},shifts:{},waitShifts:{},any:false,state:personState(p)};
+    const seenDay={};
+    for(const l of p.lines){
+      if(l.status==='Rejected') continue;
+      const ok=l.status==='Approved';
+      if(!ok&&!INCL_WAIT) continue;
+      const add=k=>{ const c=r.cells[k]||(r.cells[k]={n:0,wait:0,days:[]}); ok?c.n++:c.wait++; c.days.push(l.date); r.any=true; };
+      if(l.allow) add(l.allow);
+      else{
+        for(const j of l.jobs||[]){ jobs.add(j); add(j); }
+        if(l.shift&&!seenDay[l.date]){ seenDay[l.date]=1; const b=ok?r.shifts:r.waitShifts; b[l.shift]=(b[l.shift]||0)+1; r.any=true; }
+      }
+    }
+    if(r.any) rows.push(r);
+  }
+  const names=[...new Set(rows.flatMap(r=>Object.keys(r.cells)))];
+  const cols=names.map(n=>({name:n,kind:kinds[n]||(jobs.has(n)?'job':'daily')}))
+    .sort((a,b)=>KIND_ORDER[a.kind]-KIND_ORDER[b.kind]||a.name.localeCompare(b.name));
+  const tot={}, wt={}, shiftTot={};
+  for(const r of rows){
+    for(const [k,c] of Object.entries(r.cells)){ tot[k]=(tot[k]||0)+c.n; wt[k]=(wt[k]||0)+c.wait; }
+    for(const [k,n] of Object.entries(r.shifts)) shiftTot[k]=(shiftTot[k]||0)+n;
+  }
+  return {rows,cols,tot,wt,shiftTot};
+}
+function dayList(days){
+  const n={}; for(const d of days) n[d]=(n[d]||0)+1;
+  return Object.keys(n).sort().map(d=>shortDay(d)+(n[d]>1?' ×'+n[d]:'')).join(' · ');
+}
+function shiftChips(o,cls){ return Object.entries(o).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0])).map(([k,n])=>`<span class="sh${cls||''}">${esc(k)}<i>× ${n}</i></span>`).join(''); }
+function allowHtml(){
+  const {rows,cols,tot,wt,shiftTot}=allowData();
+  const out=WEEK.people.filter(p=>p.status!=='approved'&&p.lines.length).length;
+  const title=`<div class="printonly"><h2 style="margin:0 0 10px">Allowances — ${esc(WEEK.site)}, ${esc(weekLabel(WEEK.weekStart,WEEK.weekEnd))}${INCL_WAIT?' (including not yet approved)':' (approved)'}</h2></div>`;
+  const note=out&&!INCL_WAIT?`<div class="banner warn noprint" style="margin:0 0 14px">${out} ${out===1?'person isn’t':'people aren’t'} fully approved yet, so their unapproved allowances aren’t counted.
+      <button class="btn small" onclick="INCL_WAIT=true;renderWeek()">Show them too</button></div>`:'';
+  if(!rows.length) return title+note+`<div class="card empty">No allowances or shifts ${INCL_WAIT?'':'approved '}this week.</div>`;
+  const tiles=cols.map(c=>`<div class="atile k-${c.kind}"><b>${tot[c.name]||0}</b>${wt[c.name]?`<span class="meta" style="color:var(--amber);font-weight:700">+${wt[c.name]} waiting</span>`:''}<div class="nm">${esc(c.name)}</div><div class="kd">${esc(KIND[c.kind])}</div></div>`).join('');
+  const sh=Object.keys(shiftTot).length?`<div class="shiftrow"><b style="margin-right:4px">Shifts worked</b>${shiftChips(shiftTot)}</div>`:'';
+  // header: allowance kind groups over their columns
+  const groups=[]; for(const c of cols){ const g=groups[groups.length-1]; if(g&&g.kind===c.kind) g.n++; else groups.push({kind:c.kind,n:1}); }
+  const head=`<tr><th rowspan="2">Name</th><th rowspan="2">Shifts worked</th>${groups.map(g=>`<th class="grp k-${g.kind}" colspan="${g.n}">${esc(KIND[g.kind])}</th>`).join('')}</tr>
+    <tr>${cols.map(c=>`<th class="col">${esc(c.name)}</th>`).join('')}</tr>`;
+  const cell=(c,col)=>{
+    if(!c||(!c.n&&!c.wait)) return '<td class="c none">–</td>';
+    const big=col.kind==='weekly'?(c.n?'✓':''):(c.n||'');
+    return `<td class="c">${big!==''?`<b>${big}</b>`:''}${c.wait?`<span class="w">+${c.wait} waiting</span>`:''}${col.kind==='weekly'?'':`<small>${esc(dayList(c.days))}</small>`}</td>`;
+  };
+  const body=rows.map(r=>`<tr class="${r.state.all?'isdone':''}">
+      <td class="nm"><button onclick="openFromAllow(${js(r.p.key)})">${esc(r.p.name)}</button><div class="meta" style="font-size:11.5px">${esc(r.p.type||'')}${r.p.status!=='approved'?' · '+esc(STATUS[r.p.status]):''}${r.state.all?' · ✓ processed':''}</div></td>
+      <td>${shiftChips(r.shifts)||(Object.keys(r.waitShifts).length?'':'<span class="meta">–</span>')}${Object.keys(r.waitShifts).length?`<div style="margin-top:3px">${shiftChips(r.waitShifts)} <span class="meta" style="color:var(--amber);font-size:11px;font-weight:700">waiting</span></div>`:''}</td>
+      ${cols.map(c=>cell(r.cells[c.name],c)).join('')}</tr>`).join('');
+  const foot=`<tr class="tot"><td class="nm">Total <span class="meta">(${rows.length} people)</span></td><td>${shiftChips(shiftTot)}</td>${cols.map(c=>`<td class="c"><b>${tot[c.name]||0}</b>${wt[c.name]?`<span class="w">+${wt[c.name]} waiting</span>`:''}</td>`).join('')}</tr>`;
+  return title+note+`<div class="atiles">${tiles}</div>${sh}
+    <div class="tablewrap"><table class="atable"><thead>${head}</thead><tbody>${body}${foot}</tbody></table></div>
+    <div class="meta" style="margin-top:8px">Counts are numbers of days (per shift / day), call-outs (per job) or ✓ for the week (weekly). Shifts are counted once a day, from <b>Shift worked</b>. Grey rows are processed. Click a name to see their lines. The Excel download has the same table on its <b>Allowances</b> sheet.</div>`;
+}
+function openFromAllow(key){
+  VIEW='people'; FILTER='all'; QUERY=''; OPEN.add(key); renderWeek();
+  const el=document.getElementById('p-'+key); if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
 }
 function setFilter(k){ FILTER=k; renderWeek(); }
 

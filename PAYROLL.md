@@ -24,6 +24,15 @@
   - add a line of hours or an allowance on any day of the week.
 
   Write a reason, then **Save changes**. Each change is stamped on the line's Notes as "Payroll changed … (by you on date — reason)" and listed under **Payroll changes** for that person. A removed line is noted on the person's other lines. Only approved lines can be changed here: waiting and sent-back lines stay with the supervisor and the worker.
+- **See what allowances to pay (Allowances view).** In a site's week, switch from **People** to **Allowances**. You get:
+  - a card for each allowance with the site's total, coloured by kind:
+    - **per shift / day**: daily allowances from the Allowances list, e.g. Night Shift, Weekend, Public holiday;
+    - **per job**: the call-out ticks on hours lines;
+    - **weekly**: e.g. On call;
+  - the site's **Shifts worked** totals (from each day's Shift worked);
+  - a table with one row per person and one column per allowance. Each cell shows how many, plus which days ("Mon · Wed · Thu ×2"); a weekly allowance shows ✓. There's a total row at the bottom.
+
+  Only approved lines are counted. Tick **Include not yet approved** to see the rest as "+n waiting". Processed people are grey. Click a name to jump to their lines. **Print** prints the table, and the Excel download has the same table on an **Allowances** sheet (the PDF has a short list). An allowance's kind comes from its **Frequency** in the Allowances list.
 - **Download Excel or PDF.** These hold the week's approved hours, in the same layout as the automatic payroll email. Approved leave is included too: a **Leave** sheet in Excel, and a Leave section in the PDF.
 - **Process as you go.** You can process at three levels:
   - **Each line** has a tick box: tick it when you've processed that line.

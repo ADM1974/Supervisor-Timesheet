@@ -217,6 +217,48 @@ function personWeeks(rows, leave) {
   }).sort((a, b) => b.weekStart.localeCompare(a.weekStart));
 }
 
+// ---- allowances: what kind each one is, and a person × allowance count for the week ----
+// Allowances list → { title: 'daily' | 'weekly' | 'job' } (Frequency: Daily (default), Weekly, Per job)
+function allowanceTypes(token) {
+  return memo('allowtypes', async () => {
+    const out = {};
+    for (const it of await listByName(token, 'Allowances')) {
+      const f = it.fields || {}; if (f.Active === false) continue;
+      const t = String(f.Title || '').trim(); if (!t || out[t]) continue;
+      const fr = String(f.Frequency || 'Daily').trim().toLowerCase();
+      out[t] = /job/.test(fr) ? 'job' : fr === 'weekly' ? 'weekly' : 'daily';
+    }
+    return out;
+  });
+}
+const KIND_ORDER = { daily: 0, job: 1, weekly: 2 };
+// Approved rows → { cols:[{name,kind}], people:[{name, counts:{}, days:{}, shifts:{}}], totals:{} }.
+// Daily/weekly allowances are their own rows; per-job ones (Call-out) are ticks on an hours row;
+// the shift worked is counted once per day.
+function allowanceSummary(rows, types) {
+  const by = {}, jobNames = new Set();
+  for (const it of rows) {
+    const f = it.fields || {};
+    const name = String(f.Title || '').trim() || 'Worker';
+    const p = by[name.toLowerCase()] || (by[name.toLowerCase()] = { name, counts: {}, days: {}, shifts: {}, shiftDays: new Set() });
+    const d = dayOf(f);
+    const bump = k => { p.counts[k] = (p.counts[k] || 0) + 1; (p.days[k] = p.days[k] || []).push(d); };
+    if (isAllow(f)) bump(String(f.Allowance || f.WorkOrder || '').trim() || 'Allowance');
+    else {
+      for (const j of S.jobAllowancesOf(f)) { jobNames.add(j); bump(j); }
+      const sh = String(f.ShiftWorked || '').trim();
+      if (sh && !p.shiftDays.has(d)) { p.shiftDays.add(d); p.shifts[sh] = (p.shifts[sh] || 0) + 1; }
+    }
+  }
+  const people = Object.values(by).map(({ shiftDays, ...p }) => p).sort((a, b) => a.name.localeCompare(b.name));
+  const names = [...new Set(people.flatMap(p => Object.keys(p.counts)))];
+  const cols = names.map(n => ({ name: n, kind: types[n] || (jobNames.has(n) ? 'job' : 'daily') }))
+    .sort((a, b) => KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.name.localeCompare(b.name));
+  const totals = {};
+  for (const p of people) for (const [k, n] of Object.entries(p.counts)) totals[k] = (totals[k] || 0) + n;
+  return { cols, people: people.filter(p => Object.keys(p.counts).length || Object.keys(p.shifts).length), totals };
+}
+
 function personKeyOf(f) { return String(f.ContractorId || f.Title || '').trim() || 'unknown'; }
 function shapeWeek(site, ws, we, rows, expected, leave) {
   const people = {};
@@ -244,6 +286,7 @@ function shapeWeek(site, ws, we, rows, expected, leave) {
       allow: isAllow(f) ? (String(f.Allowance || f.WorkOrder || '').trim() || 'Allowance') : '',
       wo: isAllow(f) ? '' : String(f.WorkOrder || '').trim(), hr: isAllow(f) ? 0 : r2(f.Hours),
       comment: String(f.Comment || ''), jobs: isAllow(f) ? [] : S.jobAllowancesOf(f),
+      shift: String(f.ShiftWorked || '').trim(), rostered: String(f.RosteredShift || '').trim(),
       held: S.HELD_RE.test(notes), processed: pm ? { by: pm[1].trim(), when: pm[2] } : null,
       approvedBy: String(f.ApprovedBy || '').trim(), rejection: String(f.RejectionReason || '').trim(),
     });
@@ -398,16 +441,17 @@ exports.handler = async (event) => {
 
     // ---- one site's week ----
     if (action === 'week') {
-      const { week } = await loadWeek(token, site, ws);
-      const allowances = [...new Set((await listByName(token, 'Allowances')).map(it => (it.fields || {}))
-        .filter(f => f.Active !== false).map(f => String(f.Title || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
-      return reply(200, { ok: true, ...week, allowances });
+      const [{ week }, allowanceKinds] = await Promise.all([loadWeek(token, site, ws), allowanceTypes(token).catch(() => ({}))]);
+      const allowances = Object.keys(allowanceKinds).sort((a, b) => a.localeCompare(b));
+      return reply(200, { ok: true, ...week, allowances, allowanceKinds });
     }
 
     // ---- download Excel / PDF of the approved hours (with leave) ----
     if (action === 'export') {
       const { rows, week, leave } = await loadWeek(token, site, ws);
-      const rep = buildReportData(site, week.weekStart, week.weekEnd, rows.filter(it => (it.fields || {}).Status === 'Approved'));
+      const approved = rows.filter(it => (it.fields || {}).Status === 'Approved');
+      const rep = buildReportData(site, week.weekStart, week.weekEnd, approved);
+      rep.allowSummary = allowanceSummary(approved, await allowanceTypes(token).catch(() => ({})));
       rep.leave = leave.filter(l => L.FINAL_OK.includes(l.status)).flatMap(l => l.days.map(d => ({ name: l.name, date: d.date, type: l.type, code: l.code, hours: d.hours })))
         .sort((a, b) => a.name.localeCompare(b.name) || a.date.localeCompare(b.date));
       const pdf = String(data.format) === 'pdf';

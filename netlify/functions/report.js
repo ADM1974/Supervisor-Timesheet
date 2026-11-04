@@ -48,6 +48,7 @@ function buildReportData(site, weekStart, weekEnd, rows) {
   return { site, weekStart, weekEnd, workers, grandTotal, jobCounts };
 }
 
+const KIND_LABEL = { daily: 'per shift / day', job: 'per job', weekly: 'weekly' };
 // ---- spreadsheet ----
 async function makeXlsx(rep) {
   const wb = new ExcelJS.Workbook();
@@ -65,6 +66,19 @@ async function makeXlsx(rep) {
   }
   ws.addRow(['GRAND TOTAL', '', '', rep.grandTotal, jobSummary(rep.jobCounts), '', '']).font = { bold: true, size: 12 };
   ws.columns.forEach((c, i) => { c.width = i === 0 ? 24 : (i === 2 ? 26 : 16); });
+  const al = rep.allowSummary;
+  if (al && al.cols.length + al.people.length) {          // payroll page: allowance counts per person
+    const sh = wb.addWorksheet('Allowances');
+    sh.addRow([`Allowances — ${rep.site}, ${rep.weekStart} to ${rep.weekEnd} (approved)`]).font = { bold: true, size: 14 };
+    sh.addRow([]);
+    sh.addRow(['', '', ...al.cols.map(c => KIND_LABEL[c.kind] || '')]).font = { italic: true, color: { argb: 'FF667085' } };
+    sh.addRow(['Worker', 'Shifts worked', ...al.cols.map(c => c.name)]).font = { bold: true };
+    for (const p of al.people) {
+      sh.addRow([p.name, Object.entries(p.shifts).map(([s, n]) => `${s} × ${n}`).join(', '), ...al.cols.map(c => p.counts[c.name] || null)]);
+    }
+    sh.addRow(['TOTAL', '', ...al.cols.map(c => al.totals[c.name] || 0)]).font = { bold: true };
+    sh.columns.forEach((c, i) => { c.width = i === 0 ? 24 : i === 1 ? 26 : 16; });
+  }
   if (rep.leave && rep.leave.length) {                     // payroll page: approved leave in the week
     const lv = wb.addWorksheet('Leave');
     lv.addRow([`Leave — ${rep.site}, ${rep.weekStart} to ${rep.weekEnd}`]).font = { bold: true, size: 14 };
@@ -99,6 +113,17 @@ async function makePdf(rep) {
   }
   y -= 6;
   put(`GRAND TOTAL: ${rep.grandTotal} h${jobSummary(rep.jobCounts) ? '  ·  ' + jobSummary(rep.jobCounts) : ''}`, bold, 13);
+  const al = rep.allowSummary;
+  if (al && al.people.length) {
+    y -= 10;
+    put('Allowances (approved)', bold, 12);
+    for (const p of al.people) {
+      const a = al.cols.filter(c => p.counts[c.name]).map(c => `${p.counts[c.name]} × ${c.name}`).join(', ');
+      const s = Object.entries(p.shifts).map(([k, n]) => `${k} × ${n}`).join(', ');
+      put(`${p.name}    ${a || 'no allowances'}${s ? '    shifts: ' + s : ''}`, font, 10, 14);
+    }
+    put(`Total: ${al.cols.map(c => `${al.totals[c.name]} × ${c.name}`).join(', ') || 'none'}`, bold, 10, 14);
+  }
   if (rep.leave && rep.leave.length) {
     y -= 10;
     put('Leave', bold, 12);
