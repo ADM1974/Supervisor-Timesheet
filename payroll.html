@@ -671,6 +671,15 @@ function detailHtml(p){
         <button class="btn primary" id="save-${esc(p.key)}" onclick="saveEdits(${js(p.key)})"${isDirty?'':' disabled'}>Save changes</button>
         ${isDirty?`<button class="btn" onclick="EDIT=null;renderPeople()">Cancel</button>`:''}
       </div>`;
+    // send approved days back to the worker: they see "Sent back" with the reason and can fix those days
+    const sbDays=[...new Set(p.lines.filter(canEdit).map(l=>l.date))].sort();
+    h+=`<div class="editbar" style="margin-top:10px">
+        <b>Send back</b>
+        ${sbDays.map(d=>`<label style="white-space:nowrap"><input type="checkbox" class="sbday-${esc(p.key)}" value="${d}"> ${dayLabel(d)}</label>`).join(' ')}
+        <input id="sbWhy-${esc(p.key)}" placeholder="Reason (the worker sees it)" style="min-width:200px;flex:1">
+        <button class="btn small" onclick="sendBackDays(${js(p.key)})">↩ Send back</button>
+      </div>
+      <div class="meta" style="margin-top:4px">The worker sees those days as sent back with your reason, changes them and saves again. Then approve them as usual.</div>`;
   }else if(p.lines.length&&personState(p).all) h+='<div class="meta" style="margin-top:10px">All processed. Untick a line (or click ✓ Processed) to change it.</div>';
   else if(p.lines.length) h+='<div class="meta" style="margin-top:10px">Only approved lines can be changed here. Waiting or sent-back lines are for the supervisor and the worker.</div>';
   if(p.log.length) h+=`<div class="log"><b>History</b>${p.log.map(x=>`<div>${esc(x)}</div>`).join('')}</div>`;
@@ -699,6 +708,21 @@ function addLine(key,kind){
     x.added.push({person:key,kind,date,hr,wo:v('addWo').value.trim()});
   }
   renderPeople();
+}
+async function sendBackDays(key){
+  if(dirty()){ toast('Save or cancel your changes first'); return; }
+  const p=WEEK.people.find(x=>x.key===key); if(!p) return;
+  const dates=[...document.querySelectorAll('.sbday-'+CSS.escape(key)+':checked')].map(x=>x.value);
+  const why=(document.getElementById('sbWhy-'+key)||{}).value||'';
+  if(!dates.length){ toast('Tick the days to send back'); return; }
+  if(!why.trim()){ toast('Say why the days are sent back'); return; }
+  const ids=p.lines.filter(l=>canEdit(l)&&dates.includes(l.date)).map(l=>l.id);
+  if(!confirm(`Send ${dates.length} day${dates.length===1?'':'s'} back to ${p.name}? They come off the approved hours until approved again.`)) return;
+  try{
+    const r=await api({action:'sendback',site:WEEK.site,weekStart:WEEK.weekStart,ids,reason:why.trim()});
+    toast(`Sent back — ${r.sentBack} line${r.sentBack===1?'':'s'}`);
+    await loadWeek(WEEK.site,WEEK.weekStart,true);
+  }catch(e){ toast(e.message); }
 }
 async function saveEdits(key){
   if(!dirty()||EDIT.key!==key) return;

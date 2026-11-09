@@ -482,6 +482,37 @@ exports.handler = async (event) => {
       return reply(200, { ok: true, updated: done.length, ids: done, by: who, when });
     }
 
+    // ---- send approved days back to the worker (they become Rejected, as a supervisor's send-back) ----
+    // { ids:[approved line ids], reason }. The worker sees "Sent back" with the reason on those days and
+    // can change them and save again; the supervisor then approves them as usual. Processed lines are
+    // refused (reopen first), so nothing already paid is reopened by mistake.
+    if (action === 'sendback') {
+      const reason = String(data.reason || '').trim().slice(0, 255);
+      if (!reason) return reply(400, { ok: false, error: 'Say why the days are sent back.' });
+      const ids = [...new Set((Array.isArray(data.ids) ? data.ids : []).map(String))];
+      if (!ids.length) return reply(400, { ok: false, error: 'Tick at least one day to send back.' });
+      const { rows } = await loadWeek(token, site, ws);
+      const byId = new Map(rows.map(it => [String(it.id), it]));
+      for (const id of ids) {
+        const f = (byId.get(id) || {}).fields;
+        if (!f) return reply(400, { ok: false, error: 'A line is no longer in this week — reload.' });
+        if (f.Status !== 'Approved') return reply(400, { ok: false, error: 'Only approved lines can be sent back here.' });
+        if (PROC_RE.test(String(f.Notes || ''))) return reply(400, { ok: false, error: 'Some of those lines are marked processed — reopen them first.' });
+      }
+      let done = 0;
+      for (let i = 0; i < ids.length; i += 5) {
+        await Promise.all(ids.slice(i, i + 5).map(async id => {
+          const f = byId.get(id).fields || {};
+          const upd = { Status: 'Rejected', RejectionReason: reason, ApprovedBy: who, ApprovedDate: nowIso,
+            Notes: appendNote(f.Notes, `Sent back after approval by ${who} on ${when} — ${reason}`) };
+          try { await S.updateItem(token, id, upd); }
+          catch (err) { const { RejectionReason, ApprovedBy, ApprovedDate, ...rest } = upd; await S.updateItem(token, id, rest); }   // optional columns missing
+          done++;
+        }));
+      }
+      return reply(200, { ok: true, sentBack: done });
+    }
+
     // ---- payroll corrections to approved lines ----
     if (action === 'edit') {
       const { rows } = await loadWeek(token, site, ws);
