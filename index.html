@@ -388,8 +388,11 @@ function cardHtml(g){
     ${contractNote(g)}
     ${g.resent?`<div class="ocnote held">↩ Re-sent after being sent back${g.resentWhy?' (you said: “'+esc(g.resentWhy)+'”)':''}</div>`:''}
     ${days}
+    ${g.running&&g.key!==REJECT_KEY?`<div class="ocnote">📅 This week is still running – you can approve it from <b>${esc(dayLabel(g.weekEnd))}</b>, its last day. To fix a day now, use <b>Reject</b> and tick only that day.</div>`:''}
     ${g.key===REJECT_KEY?rejectBoxHtml(g):`<div class="acts">
-      ${g.held && !g.canSenior
+      ${g.running
+        ? ''
+        : g.held && !g.canSenior
         ? `<span class="waitnote">Waiting for the senior approver</span>`
         : `<button class="approve" onclick="decide('${esc(g.key)}','approve')">${g.held?'Approve extra hours':'Approve'}</button>
       <button class="amendbtn" onclick="startAmend('${esc(g.key)}')">Amend</button>`}
@@ -402,10 +405,10 @@ function cardHtml(g){
 function rejectBoxHtml(g){
   const days=(g.days||[]).map(d=>{
     const hrs=(d.lines||[]).filter(l=>!l.allow).reduce((s,l)=>s+(Number(l.hr)||0),0);
-    return `<label class="rejday"><input type="checkbox" class="rejd" value="${esc(d.date)}" checked><span>${dayLabel(d.date)}</span><span class="rh">${fmtHr(hrs)}</span></label>`;
+    return `<label class="rejday"><input type="checkbox" class="rejd" value="${esc(d.date)}"${g.running?'':' checked'}><span>${dayLabel(d.date)}</span><span class="rh">${fmtHr(hrs)}</span></label>`;
   }).join('');
   return `<div class="rejbox"><div class="rejh">Send back which days?</div>
-    <div class="meta">Untick the days that are right — they’re approved now and go to payroll.</div>
+    <div class="meta">${g.running?'Tick only the day(s) to send back. The other days stay waiting and are approved with the rest of the week.':'Untick the days that are right — they’re approved now and go to payroll.'}</div>
     ${days}
     <textarea id="rejWhy" rows="2" placeholder="Reason — the worker sees this"></textarea>
     <div class="acts"><button class="reject" onclick="sendReject('${esc(g.key)}')">Send back</button>
@@ -677,6 +680,7 @@ async function decide(key, action, rej){
     if(action==='reject') REJECT_KEY=null;
     const sentBack=rej&&rej.rejectDates?`Sent back ${rej.rejectDates.length} day${rej.rejectDates.length===1?'':'s'} of ${g.name}’s week`:'';
     if(data.held){ toast(`${sentBack?sentBack+'; the rest':'OK’d — '+g.name+'’s week'} is ${fmtHr(data.overBy)} over contract, sent to the senior approver`); await loadPending(); return; }
+    if(sentBack && data.kept){ toast(sentBack+' — the other days stay waiting until the week ends'); await loadPending(); return; }
     if(sentBack && !data.updated){ toast(sentBack+' — the rest is with the senior approver'); await loadPending(); return; }
     GROUPS=GROUPS.filter(x=>x.key!==key);
     renderApprovals();

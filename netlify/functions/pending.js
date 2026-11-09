@@ -3,7 +3,7 @@
 // work-order lines + hours, the group total, and the row ids to action.
 // Weeks over the worker's contract hours carry contract / overBy, and once the supervisor
 // has OK'd them, held = true until the site's senior approver approves (canSenior).
-const { getAppToken, validateSupervisorToken, getSupervisorSites, getWorkOrderEditorSites, getSubmittedForSites, ownsRow, getSitesDetailed, nextPayrollSend, payWeekOf, personWeekKey, jobAllowancesOf, getContractHours, isSeniorFor, HELD_RE, mayApproveOwn } = require('./supervisor');
+const { getAppToken, validateSupervisorToken, getSupervisorSites, getWorkOrderEditorSites, getSubmittedForSites, ownsRow, getSitesDetailed, nextPayrollSend, payWeekOf, personWeekKey, jobAllowancesOf, getContractHours, isSeniorFor, HELD_RE, mayApproveOwn, weekRunning, payWeekEndOf } = require('./supervisor');
 
 exports.handler = async (event) => {
   const headers = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
@@ -36,7 +36,7 @@ exports.handler = async (event) => {
       const date = String(f.EntryDate || '').slice(0, 10);
       const key = personWeekKey(f);
       if (!groups[key]) {
-        groups[key] = { key, name: String(f.Title || '').trim() || 'Worker', siteSet: new Set(), weekStart: payWeekOf(f), ids: [], total: 0, byDate: {}, shiftByDate: {}, held: false, heldBy: '', resent: false, resentWhy: '' };
+        groups[key] = { key, name: String(f.Title || '').trim() || 'Worker', siteSet: new Set(), weekStart: payWeekOf(f), weekEnd: payWeekEndOf(f), running: weekRunning(f), ids: [], total: 0, byDate: {}, shiftByDate: {}, held: false, heldBy: '', resent: false, resentWhy: '' };
       }
       const g = groups[key];
       const hm = /Supervisor OK by ([^<·]+?)\s*(?:<[^>]*>)?\s+on [^·]*awaiting senior approval/i.exec(String(f.Notes || ''));
@@ -68,6 +68,8 @@ exports.handler = async (event) => {
       name: g.name,
       site: siteList.join(', '),
       weekStart: g.weekStart || '',
+      weekEnd: g.weekEnd || '',
+      running: g.running,        // the week hasn't reached its last day: can be sent back, not approved yet
       total,
       contract,
       overBy: contract ? Math.max(0, Math.round((total - contract) * 100) / 100) : 0,

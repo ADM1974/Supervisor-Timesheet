@@ -11,7 +11,10 @@
 // Over contract: a week with more hours than the worker's contract (Workers.ContractHours)
 // needs the site's senior approver too. A supervisor's Approve then only marks it
 // "awaiting senior approval" (still Submitted); the senior approver's Approve approves it.
-const { getAppToken, validateSupervisorToken, getSupervisorSites, getSubmittedForSites, updateItem, ownsRow, overContract, mayApproveOwn } = require('./supervisor');
+//
+// Per week: rows of a pay week that hasn't reached its last day yet are never approved. Approve is
+// refused for them; a Reject sends back the ticked days and leaves the other days waiting.
+const { getAppToken, validateSupervisorToken, getSupervisorSites, getSubmittedForSites, updateItem, ownsRow, overContract, mayApproveOwn, weekRunning, payWeekEndOf } = require('./supervisor');
 
 exports.handler = async (event) => {
   const headers = { 'Content-Type': 'application/json' };
@@ -53,7 +56,14 @@ exports.handler = async (event) => {
       ? new Set(data.rejectDates.map(d => String(d).slice(0, 10))) : null;
     const rejectSet = new Set(action === 'reject' ? targets.filter(id => !pick || pick.has(dateOf(id))) : []);
     if (action === 'reject' && !rejectSet.size) return bad('Tick at least one day to send back.');
-    const approveIds = targets.filter(id => !rejectSet.has(id));
+    const running = id => weekRunning(allowed.get(id).fields || {});
+    if (action === 'approve' && targets.some(running)) {
+      const we = payWeekEndOf(allowed.get(targets.find(running)).fields || {});
+      const day = new Date(we + 'T00:00:00Z').toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'short', timeZone: 'UTC' });
+      return bad(`This week is still running – approve it from ${day}, its last day. To fix a day now, use Reject and tick that day.`);
+    }
+    const approveIds = targets.filter(id => !rejectSet.has(id) && !running(id));   // a running week's other days stay waiting
+    const kept = targets.filter(id => !rejectSet.has(id) && running(id)).length;
 
     const decideRow = async (id, status, stamp, extra) => {
       const prev = String((allowed.get(id).fields || {}).Notes || '').trim();
@@ -92,7 +102,7 @@ exports.handler = async (event) => {
       for (const id of approveIds) { await decideRow(id, 'Approved', `Approved by ${who} on ${when}${overNote}`); updated++; }
     }
 
-    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, updated, rejected }) };
+    return { statusCode: 200, headers, body: JSON.stringify({ ok: true, updated, rejected, kept }) };
   } catch (err) {
     console.error(err);
     return { statusCode: 502, headers, body: JSON.stringify({ ok: false, error: 'server' }) };

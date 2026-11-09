@@ -317,6 +317,12 @@ function payWeekOf(f) {
   return m ? m[1] : weekStartOf(String(f.EntryDate || '').slice(0, 10));
 }
 // One approval card = one person's pay week. ContractorId is the stable per-person key; the name if it's missing.
+// Approvals are done per WEEK: a pay week can be approved from its last day (the site's close day).
+// Before that the week is still running – days can be sent back, but nothing is approved, so the
+// worker's days are never locked while they are still adding to them.
+const todayIso = () => { const t = nzToday(); return `${t.y}-${String(t.m).padStart(2, '0')}-${String(t.d).padStart(2, '0')}`; };
+function payWeekEndOf(f) { const ws = payWeekOf(f); return ws ? new Date(Date.parse(ws + 'T00:00:00Z') + 6 * 864e5).toISOString().slice(0, 10) : ''; }
+const weekRunning = f => { const we = payWeekEndOf(f); return !!we && todayIso() < we; };
 function personWeekKey(f) {
   const person = String(f.ContractorId || f.Title || '').trim() || 'unknown';
   const date = String(f.EntryDate || '').slice(0, 10);
@@ -403,6 +409,9 @@ exports.nextPayrollSend = nextPayrollSend;
 exports.nzNow = nzNow;
 exports.weekStartOf = weekStartOf;
 exports.personWeekKey = personWeekKey;
+exports.payWeekEndOf = payWeekEndOf;
+exports.weekRunning = weekRunning;
+exports.todayIso = todayIso;
 exports.payWeekOf = payWeekOf;
 exports.jobAllowancesOf = jobAllowancesOf;
 exports.getContractHours = getContractHours;
