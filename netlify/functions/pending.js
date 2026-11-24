@@ -36,7 +36,7 @@ exports.handler = async (event) => {
       const date = String(f.EntryDate || '').slice(0, 10);
       const key = personWeekKey(f);
       if (!groups[key]) {
-        groups[key] = { key, name: String(f.Title || '').trim() || 'Worker', siteSet: new Set(), weekStart: payWeekOf(f), weekEnd: payWeekEndOf(f), running: weekRunning(f), ids: [], total: 0, byDate: {}, shiftByDate: {}, held: false, heldBy: '', resent: false, resentWhy: '' };
+        groups[key] = { key, name: String(f.Title || '').trim() || 'Worker', siteSet: new Set(), weekStart: payWeekOf(f), weekEnd: payWeekEndOf(f, detailed), running: weekRunning(f, detailed), ids: [], total: 0, byDate: {}, shiftByDate: {}, held: false, heldBy: '', resent: false, resentWhy: '' };
       }
       const g = groups[key];
       const hm = /Supervisor OK by ([^<·]+?)\s*(?:<[^>]*>)?\s+on [^·]*awaiting senior approval/i.exec(String(f.Notes || ''));

@@ -14,7 +14,7 @@
 //
 // Per week: rows of a pay week that hasn't reached its last day yet are never approved. Approve is
 // refused for them; a Reject sends back the ticked days and leaves the other days waiting.
-const { getAppToken, validateSupervisorToken, getSupervisorSites, getSubmittedForSites, updateItem, ownsRow, overContract, mayApproveOwn, weekRunning, payWeekEndOf } = require('./supervisor');
+const { getAppToken, validateSupervisorToken, getSupervisorSites, getSubmittedForSites, updateItem, ownsRow, overContract, mayApproveOwn, weekRunning, payWeekEndOf, getSitesDetailed } = require('./supervisor');
 
 exports.handler = async (event) => {
   const headers = { 'Content-Type': 'application/json' };
@@ -41,6 +41,7 @@ exports.handler = async (event) => {
     // Re-fetch what's actually Submitted for this supervisor's sites; only ids
     // present in that set are allowed to be actioned.
     const rows = await getSubmittedForSites(token, sites);
+    const detailed = await getSitesDetailed(token);                  // site close days → the "running" week boundary
     const selfOk = await mayApproveOwn(token, user.email);           // testing switch (Settings: SelfApprove)
     const allowed = new Map(rows.filter(it => selfOk || !ownsRow(it.fields, user)).map(it => [String(it.id), it]));
     const targets = ids.filter(id => allowed.has(id));
@@ -56,9 +57,9 @@ exports.handler = async (event) => {
       ? new Set(data.rejectDates.map(d => String(d).slice(0, 10))) : null;
     const rejectSet = new Set(action === 'reject' ? targets.filter(id => !pick || pick.has(dateOf(id))) : []);
     if (action === 'reject' && !rejectSet.size) return bad('Tick at least one day to send back.');
-    const running = id => weekRunning(allowed.get(id).fields || {});
+    const running = id => weekRunning(allowed.get(id).fields || {}, detailed);
     if (action === 'approve' && targets.some(running)) {
-      const we = payWeekEndOf(allowed.get(targets.find(running)).fields || {});
+      const we = payWeekEndOf(allowed.get(targets.find(running)).fields || {}, detailed);
       const day = new Date(we + 'T00:00:00Z').toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'short', timeZone: 'UTC' });
       return bad(`This week is still running – approve it from ${day}, its last day. To fix a day now, use Reject and tick that day.`);
     }

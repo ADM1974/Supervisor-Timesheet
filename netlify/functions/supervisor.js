@@ -321,8 +321,26 @@ function payWeekOf(f) {
 // Before that the week is still running – days can be sent back, but nothing is approved, so the
 // worker's days are never locked while they are still adding to them.
 const todayIso = () => { const t = nzToday(); return `${t.y}-${String(t.m).padStart(2, '0')}-${String(t.d).padStart(2, '0')}`; };
-function payWeekEndOf(f) { const ws = payWeekOf(f); return ws ? new Date(Date.parse(ws + 'T00:00:00Z') + 6 * 864e5).toISOString().slice(0, 10) : ''; }
-const weekRunning = f => { const we = payWeekEndOf(f); return !!we && todayIso() < we; };
+// The day a row's pay week ENDS (ISO). Prefer the SITE's real close day (Sites list
+// CloseDay, via a `detailed` map) applied to the row's EntryDate, so the week matches how
+// the site actually pays — even when the worker app stamped the week wrong (e.g. a staff
+// member who had no home site, so their app defaulted to a Sunday week). Falls back to the
+// BatchID week stamp (then Monday) when the site or its close day isn't known.
+function payWeekEndOf(f, detailed) {
+  const site = String((f && f.Site) || '').trim();
+  const info = detailed && site ? detailed[site] : null;
+  const d = String((f && f.EntryDate) || '').slice(0, 10);
+  if (info && typeof info.closeDayIndex === 'number' && d) {
+    const base = Date.parse(d + 'T00:00:00Z');
+    if (!isNaN(base)) {
+      const dow = new Date(base).getUTCDay();
+      return new Date(base + ((info.closeDayIndex - dow + 7) % 7) * 864e5).toISOString().slice(0, 10);
+    }
+  }
+  const ws = payWeekOf(f);
+  return ws ? new Date(Date.parse(ws + 'T00:00:00Z') + 6 * 864e5).toISOString().slice(0, 10) : '';
+}
+const weekRunning = (f, detailed) => { const we = payWeekEndOf(f, detailed); return !!we && todayIso() < we; };
 function personWeekKey(f) {
   const person = String(f.ContractorId || f.Title || '').trim() || 'unknown';
   const date = String(f.EntryDate || '').slice(0, 10);
